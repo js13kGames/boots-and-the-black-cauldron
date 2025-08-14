@@ -12,6 +12,7 @@ const sourceFiles =
 [
     '../../dist/littlejs.release.js',
     'game.js',
+    'player-small.js',
     // add your game's files here
 ];
 const dataFiles =

@@ -7,90 +7,130 @@
 
 'use strict';
 
+let gameStarted, level, exit, boots;
+
 // sound effects
 const sound_click = new Sound([1,.5]);
 
 // game variables
 let particleEmitter;
 
+var title_player = new CPlayer();
+
 // webgl can be disabled to save even more space
 //glEnable = false;
+objectDefaultDamping = .7;
+
+const levelSize = vec2(40, 22);
+
+class Boots extends EngineObject {
+    constructor(pos) {
+        super(pos, vec2(1,1));
+        this.color = new Color(0,0,0);
+        this.setCollision();
+        this.mass = 1;
+        this.health = 10;
+        this.speed = 1;
+        this.state = 'idle';
+        this.damage = 1;
+        this.currentFrame = 0;
+        this.frameOffset = 0;
+        this.maxFrames = 0;
+        this.drawSize = vec2(1,1);
+    }
+
+    update() {
+        // movement control
+        this.moveInput = isUsingGamepad ? gamepadStick(0) : keyDirection();
+
+        //this.pos.x += this.moveInput.x * this.speed;
+        //this.pos.y += this.moveInput.y * this.speed;
+        // apply movement acceleration and clamp
+        const maxCharacterSpeed = .1;
+        //this.velocity.x = clamp(this.velocity.x + this.moveInput.x * .04, -maxCharacterSpeed, maxCharacterSpeed);
+        //this.velocity.y = clamp(this.velocity.y + this.moveInput.y * .04, -maxCharacterSpeed, maxCharacterSpeed);
+        this.velocity = this.velocity.add(this.moveInput.clampLength(1).scale(maxCharacterSpeed)); // clamp and scale input
+
+        //cameraPos = this.pos;
+        super.update();
+    }
+
+    collideWithObject(o) {
+        if(o instanceof Exit) {
+            console.log("Exit found! Go to next level!");
+            goToNextLevel();
+        }
+    }
+
+    takeDamage(dmg) {
+        this.health -= dmg;
+
+        if(this.health < 1) {
+            //snd_ark_destroy.play()
+            boots = 0;
+            this.destroy();
+        } else {
+            //snd_ark_hit.play();
+        }
+    }
+}
+
+class Exit extends EngineObject {
+    constructor(pos) {
+        super(pos, vec2(2,2));
+        this.color = new Color(.3,.3,.3);
+        this.setCollision();
+        this.mass = 0;
+    }
+
+    update() {
+        super.update();
+    }
+}
+
+function newGame() {
+    gameStarted = true;
+    level = 0;
+
+    goToNextLevel();
+}
+
+function goToNextLevel() {
+    level += 1;
+
+    if(boots) {
+        boots.destroy();
+    }
+
+    boots = new Boots(vec2(levelSize.x/2,levelSize.y/2));
+    console.log("Boots made");
+
+    if(exit) {
+        exit.destroy();
+    }
+
+    exit = new Exit(vec2(randInt(levelSize.x),randInt(levelSize.y)));
+    console.log("Exit made");
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 function gameInit()
 {
-    // create tile collision and visible tile layer
-    initTileCollision(vec2(32,16));
-    const pos = vec2();
-    const tileLayer = new TileLayer(pos, tileCollisionSize);
+    canvasFixedSize = vec2(1280, 720);
 
-    // get level data from the tiles image
-    const tileImage = textureInfos[0].image;
-    mainContext.drawImage(tileImage, 0, 0);
-    const imageData = mainContext.getImageData(0, 0, tileImage.width, tileImage.height).data;
-    
-    for (pos.x = tileCollisionSize.x; pos.x--;)
-    for (pos.y = tileCollisionSize.y; pos.y--;)
-    {
-        // check if this pixel is set
-        const i = pos.x + tileImage.width*(17 + tileCollisionSize.y - pos.y);
-        if (!imageData[4*i])
-            continue;
-        
-        // set tile data
-        const tileIndex = 1;
-        const direction = randInt(4)
-        const mirror = randInt(2);
-        const color = randColor();
-        const data = new TileLayerData(tileIndex, direction, mirror, color);
-        tileLayer.setData(pos, data);
-        setTileCollisionData(pos, 1);
-    }
+    cameraPos = levelSize.scale(.5);
 
-    // draw tile layer with new data
-    tileLayer.tileInfo = tile(0, 16, 0, 1); // 16x16 tiles with 1 pixel padding
-    tileLayer.redraw();
-
-    // setup camera
-    cameraPos = vec2(16,8);
-    cameraScale = 48;
-
-    // enable gravity
-    gravity = -.01;
-
-    // create particle emitter
-    particleEmitter = new ParticleEmitter(
-        vec2(16,9), 0,      // emitPos, emitAngle
-        1, 0, 500, PI,      // emitSize, emitTime, emitRate, emiteCone
-        tile(0, 16, 0, 1),  // tileIndex, tileSize
-        new Color(1,1,1),   new Color(0,0,0),   // colorStartA, colorStartB
-        new Color(0,0,0,0), new Color(0,0,0,0), // colorEndA, colorEndB
-        2, .2, .2, .1, .05, // time, sizeStart, sizeEnd, speed, angleSpeed
-        .99, 1, 1, PI,      // damping, angleDamping, gravityScale, cone
-        .05, .5, 1, 1       // fadeRate, randomness, collide, additive
-    );
-    particleEmitter.elasticity = .3; // bounce when it collides
-    particleEmitter.trailScale = 2;  // stretch in direction of motion
+    gameStarted = false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 function gameUpdate()
 {
-    if (mouseWasPressed(0))
-    {
-        // play sound when mouse is pressed
-        sound_click.play(mousePos);
-
-        // change particle color and set to fade out
-        particleEmitter.colorStartA = new Color;
-        particleEmitter.colorStartB = randColor();
-        particleEmitter.colorEndA = particleEmitter.colorStartA.scale(1,0);
-        particleEmitter.colorEndB = particleEmitter.colorStartB.scale(1,0);
+    if(mouseWasPressed(0)) {
+        if(!gameStarted) {
+            newGame();
+        }
     }
-
-    // move particles to mouse location if on screen
-    if (mousePosScreen.x)
-        particleEmitter.pos = mousePos;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -102,15 +142,23 @@ function gameUpdatePost()
 ///////////////////////////////////////////////////////////////////////////////
 function gameRender()
 {
-    // draw a grey square in the background without using webgl
-    drawRect(vec2(16,8), vec2(20,14), new Color(.6,.6,.6), 0, 0);
+    // draw white background during play
+    if(gameStarted) {
+        drawRect(cameraPos, levelSize, new Color(1,1,1));
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 function gameRenderPost()
 {
     // draw to overlay canvas for hud rendering
-    drawTextScreen('LittleJS JS13K Demo', vec2(mainCanvasSize.x/2, 70), 80);
+    if (!gameStarted) {
+        drawTextScreen('Boots the Cat', vec2(mainCanvasSize.x/2, 0 + 70), 80);
+        drawTextScreen('in', vec2(mainCanvasSize.x/2, mainCanvasSize.y/2), 80);
+        drawTextScreen('Broken Whiskerz', vec2(mainCanvasSize.x/2, mainCanvasSize.y - 70), 80);
+    } else {
+        drawTextScreen('Level: ' + level, vec2(80, 40), 30, new Color(0,0,0));
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
