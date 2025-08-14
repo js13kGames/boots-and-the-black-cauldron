@@ -29,7 +29,7 @@ class Boots extends EngineObject {
         this.color = new Color(0,0,0);
         this.setCollision();
         this.mass = 1;
-        this.lives = 2;
+        this.lives = 9;
         this.speed = 1;
         this.state = 'idle';
         this.damage = 1;
@@ -58,11 +58,13 @@ class Boots extends EngineObject {
     collideWithObject(o) {
         if(o instanceof Witch) {
             console.log("Witch found! You lost a life!");
+            player_hit_sound.play();
             die();
         }
 
         if(o instanceof Exit) {
             console.log("Exit found! Go to next level!");
+            exit_sound.play();
             goToNextLevel();
         }
     }
@@ -124,8 +126,14 @@ class Exit extends EngineObject {
     }
 }
 
+const new_game_sound = new Sound([1.1,,378,.03,.06,.18,1,2.2,,,105,.08,,,,.1,,.59,.02]); // Pickup 10
+const player_hit_sound = new Sound([,,389,.03,.02,.04,1,2.5,-1,-1,,,,,129,,,.54,.02,,-1341]); // Blip 5
+const exit_sound = new Sound([,,163,.07,.25,.22,,3.5,2,158,,,.06,,,,,.69,.18,.1,-948]); // Powerup 2
+const game_over_sound = new Sound([2,,62,.03,.01,.46,3,0,,,,,,1.8,,.3,.47,.43,.16]); // Explosion 11
+
 function newGame() {
     cleanUpWitches();
+    new_game_sound.play();
     gameStarted = true;
     gameOver = false;
     level = 0;
@@ -159,6 +167,7 @@ function die() {
 function game_over() {
     boots.destroy();
     exit.destroy();
+    game_over_sound.play();
     gameOver = true;
     gameStarted = false;
 }
@@ -185,7 +194,7 @@ function gameInit()
 ///////////////////////////////////////////////////////////////////////////////
 function gameUpdate()
 {
-    if(mouseWasPressed(0)) {
+    if(mouseWasPressed(0) || keyWasPressed('Space') || gamepadWasPressed(0) || gamepadWasPressed(1)) {
         if(!gameStarted || gameOver) {
             newGame();
         }
