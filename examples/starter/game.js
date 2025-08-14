@@ -32,6 +32,8 @@ class Boots extends EngineObject {
         this.lives = 9;
         this.speed = 1;
         this.state = 'idle';
+        this.motions = 0;
+        this.totalMotions = 0;
         this.damage = 1;
         this.currentFrame = 0;
         this.frameOffset = 0;
@@ -50,6 +52,18 @@ class Boots extends EngineObject {
         //this.velocity.x = clamp(this.velocity.x + this.moveInput.x * .04, -maxCharacterSpeed, maxCharacterSpeed);
         //this.velocity.y = clamp(this.velocity.y + this.moveInput.y * .04, -maxCharacterSpeed, maxCharacterSpeed);
         this.velocity = this.velocity.add(this.moveInput.clampLength(1).scale(maxCharacterSpeed)); // clamp and scale input
+
+        console.log(this.velocity.length());
+
+        if(this.velocity.length() < 0.05 && this.state != 'idle') {
+            this.state = 'idle';
+            this.motions += 1;
+        }
+
+        if(this.velocity.length() > 0.05 && this.state != 'walking') {
+            this.state = 'walking';
+            this.motions += 1;
+        }
 
         //cameraPos = this.pos;
         super.update();
@@ -146,6 +160,10 @@ function newGame() {
 
 function goToNextLevel() {
     level += 1;
+    boots.totalMotions += boots.motions;
+    boots.motions = 0;
+    boots.velocity = vec2(0,0);
+    boots.state = 'idle';
 
     boots.pos = vec2(randInt(levelSize.x),randInt(levelSize.y));
     exit.pos = vec2(randInt(levelSize.x),randInt(levelSize.y));
@@ -155,6 +173,8 @@ function goToNextLevel() {
 }
 
 function die() {
+    oots.velocity = vec2(0,0);
+    boots.state = 'idle';
     boots.lives -= 1;
 
     if(boots.lives < 1) {
@@ -227,12 +247,15 @@ function gameRenderPost()
             drawTextScreen('Broken Whiskerz', vec2(mainCanvasSize.x/2, mainCanvasSize.y - 70), 80);
         } else {
             drawTextScreen('Game Over', vec2(mainCanvasSize.x/2, mainCanvasSize.y/2), 160, new Color(1,0,0));
-            drawTextScreen('Level ' + level + ' reached', vec2(mainCanvasSize.x/2, mainCanvasSize.y/2+100), 60, new Color(1,0,0));
+            drawTextScreen('Level ' + level + ' Reached', vec2(mainCanvasSize.x/2, mainCanvasSize.y/2+100), 60, new Color(1,0,0));
+            drawTextScreen('Total Motions: ' + boots.totalMotions, vec2(mainCanvasSize.x/2, mainCanvasSize.y/2+200), 60, new Color(1,0,0));
         }
         
     } else {
         drawTextScreen('Level: ' + level, vec2(80, 40), 30, new Color(0,0,0));
-        drawTextScreen('Lives: ' + boots.lives, vec2(80, 140), 30, new Color(0,0,0));
+        drawTextScreen('Lives: ' + boots.lives, vec2(80, 70), 30, new Color(0,0,0));
+        drawTextScreen('Motions: ' + boots.motions, vec2(80, 100), 30, new Color(0,0,0));
+        drawTextScreen('Total Motions: ' + boots.totalMotions, vec2(110, 130), 30, new Color(0,0,0));
     }
 }
 
