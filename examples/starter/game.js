@@ -7,10 +7,14 @@
 
 'use strict';
 
-let gameStarted, gameOver, level, exit, boots, witches;
+let gameStarted, gameOver, level, timer, initialTime, clickTimer, exit, boots, witches;
 
 // sound effects
-const sound_click = new Sound([1,.5]);
+const new_game_sound = new Sound([1.1,,378,.03,.06,.18,1,2.2,,,105,.08,,,,.1,,.59,.02]); // Pickup 10
+const player_hit_sound = new Sound([,,389,.03,.02,.04,1,2.5,-1,-1,,,,,129,,,.54,.02,,-1341]); // Blip 5
+const exit_sound = new Sound([,,163,.07,.25,.22,,3.5,2,158,,,.06,,,,,.69,.18,.1,-948]); // Powerup 2
+const game_over_sound = new Sound([2,,62,.03,.01,.46,3,0,,,,,,1.8,,.3,.47,.43,.16]); // Explosion 11
+const tick_sound = new Sound([3,,12,.03,.04,.009,,1.7,-2,,4,.02,,,,,.49,.87,.01,.25]); // Blip 20
 
 // game variables
 let particleEmitter;
@@ -26,11 +30,12 @@ const levelSize = vec2(40, 22);
 class Boots extends EngineObject {
     constructor(pos) {
         super(pos, vec2(1,1));
-        this.color = new Color(0,0,0);
+        this.color = BLACK;
         this.setCollision();
         this.mass = 1;
+        this.health = 1;
         this.lives = 9;
-        this.speed = 1;
+        this.speed = .1;
         this.state = 'idle';
         this.motions = 0;
         this.totalMotions = 0;
@@ -44,23 +49,19 @@ class Boots extends EngineObject {
     update() {
         // movement control
         this.moveInput = isUsingGamepad ? gamepadStick(0) : keyDirection();
+        this.velocity = this.velocity.add(this.moveInput.clampLength(1).scale(this.speed)); // clamp and scale input
 
-        //this.pos.x += this.moveInput.x * this.speed;
-        //this.pos.y += this.moveInput.y * this.speed;
-        // apply movement acceleration and clamp
-        const maxCharacterSpeed = .1;
-        //this.velocity.x = clamp(this.velocity.x + this.moveInput.x * .04, -maxCharacterSpeed, maxCharacterSpeed);
-        //this.velocity.y = clamp(this.velocity.y + this.moveInput.y * .04, -maxCharacterSpeed, maxCharacterSpeed);
-        this.velocity = this.velocity.add(this.moveInput.clampLength(1).scale(maxCharacterSpeed)); // clamp and scale input
-
-        console.log(this.velocity.length());
-
-        if(this.velocity.length() < 0.05 && this.state != 'idle') {
+        if(this.velocity.length() < 0.2 && this.state != 'idle') {
             this.state = 'idle';
             this.motions += 1;
         }
 
-        if(this.velocity.length() > 0.05 && this.state != 'walking') {
+        if(this.velocity.length() > 0.2 && this.state != 'walking') {
+            if(!timer.active()) {
+                timer.set(initialTime);
+                clickTimer.set(1);
+                tick_sound.play();
+            }
             this.state = 'walking';
             this.motions += 1;
         }
@@ -71,37 +72,32 @@ class Boots extends EngineObject {
 
     collideWithObject(o) {
         if(o instanceof Witch) {
-            console.log("Witch found! You lost a life!");
-            player_hit_sound.play();
-            die();
+            this.takeDamage(o.damage);
         }
 
         if(o instanceof Exit) {
-            console.log("Exit found! Go to next level!");
-            exit_sound.play();
+            exit_sound.play(null, 1, 1, 1.8);
             goToNextLevel();
         }
     }
 
     takeDamage(dmg) {
         this.health -= dmg;
+        player_hit_sound.play();
 
         if(this.health < 1) {
-            //snd_ark_destroy.play()
-            boots = 0;
-            this.destroy();
-        } else {
-            //snd_ark_hit.play();
-        }
+            die();
+        } 
     }
 }
 
 class Witch extends EngineObject {
     constructor(pos) {
         super(pos, vec2(1,1));
-        this.color = new Color(.2,.2,.2);
+        this.color = PURPLE;
         this.setCollision();
         this.mass = 1;
+        this.damage = 1;
         this.travelDistance = 20;
         this.travelTarget = this.pos.add(vec2(randInt(-this.travelDistance, this.travelDistance), randInt(-this.travelDistance, this.travelDistance)));
         this.home = vec2(this.pos.x, this.pos.y);
@@ -130,7 +126,7 @@ class Witch extends EngineObject {
 class Exit extends EngineObject {
     constructor(pos) {
         super(pos, vec2(2,2));
-        this.color = new Color(.3,.3,.3);
+        this.color = BLUE;
         this.setCollision();
         this.mass = 0;
     }
@@ -139,11 +135,6 @@ class Exit extends EngineObject {
         super.update();
     }
 }
-
-const new_game_sound = new Sound([1.1,,378,.03,.06,.18,1,2.2,,,105,.08,,,,.1,,.59,.02]); // Pickup 10
-const player_hit_sound = new Sound([,,389,.03,.02,.04,1,2.5,-1,-1,,,,,129,,,.54,.02,,-1341]); // Blip 5
-const exit_sound = new Sound([,,163,.07,.25,.22,,3.5,2,158,,,.06,,,,,.69,.18,.1,-948]); // Powerup 2
-const game_over_sound = new Sound([2,,62,.03,.01,.46,3,0,,,,,,1.8,,.3,.47,.43,.16]); // Explosion 11
 
 function newGame() {
     cleanUpWitches();
@@ -167,13 +158,17 @@ function goToNextLevel() {
 
     boots.pos = vec2(randInt(levelSize.x),randInt(levelSize.y));
     exit.pos = vec2(randInt(levelSize.x),randInt(levelSize.y));
-    console.log("Exit made");
 
     witches.push(new Witch(vec2(randInt(levelSize.x),randInt(levelSize.y))));
+    
+    reset_timer();
+    timer.unset();
+    clickTimer.unset();
+    
 }
 
 function die() {
-    oots.velocity = vec2(0,0);
+    boots.velocity = vec2(0,0);
     boots.state = 'idle';
     boots.lives -= 1;
 
@@ -182,6 +177,7 @@ function die() {
     }
 
     boots.pos = vec2(randInt(levelSize.x),randInt(levelSize.y));
+    reset_timer();
 }
 
 function game_over() {
@@ -190,6 +186,13 @@ function game_over() {
     game_over_sound.play();
     gameOver = true;
     gameStarted = false;
+}
+
+function reset_timer() {
+    timer = new Timer(initialTime);
+    timer.unset();
+    clickTimer = new Timer(1);
+    clickTimer.unset();
 }
 
 function cleanUpWitches() {
@@ -205,6 +208,10 @@ function gameInit()
 
     cameraPos = levelSize.scale(.5);
 
+    initialTime = 5;
+    clickTimer = new Timer(1);
+    clickTimer.unset();
+
     gameStarted = false;
     gameOver = false;
 
@@ -219,6 +226,15 @@ function gameUpdate()
             newGame();
         }
     }
+
+    if(gameStarted && clickTimer.elapsed()) {
+        tick_sound.play();
+        clickTimer.set(1);
+    }
+
+    if(gameStarted && timer.elapsed()) {
+        die();
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -232,7 +248,7 @@ function gameRender()
 {
     // draw white background during play
     if(gameStarted) {
-        drawRect(cameraPos, levelSize, new Color(1,1,1));
+        drawRect(cameraPos, levelSize, WHITE);
     }
 }
 
@@ -246,16 +262,22 @@ function gameRenderPost()
             drawTextScreen('in', vec2(mainCanvasSize.x/2, mainCanvasSize.y/2), 80);
             drawTextScreen('Broken Whiskerz', vec2(mainCanvasSize.x/2, mainCanvasSize.y - 70), 80);
         } else {
-            drawTextScreen('Game Over', vec2(mainCanvasSize.x/2, mainCanvasSize.y/2), 160, new Color(1,0,0));
-            drawTextScreen('Level ' + level + ' Reached', vec2(mainCanvasSize.x/2, mainCanvasSize.y/2+100), 60, new Color(1,0,0));
-            drawTextScreen('Total Motions: ' + boots.totalMotions, vec2(mainCanvasSize.x/2, mainCanvasSize.y/2+200), 60, new Color(1,0,0));
+            drawTextScreen('Game Over', vec2(mainCanvasSize.x/2, mainCanvasSize.y/2), 160, RED);
+            drawTextScreen('Level ' + level + ' Reached', vec2(mainCanvasSize.x/2, mainCanvasSize.y/2+100), 60, RED);
+            //drawTextScreen('Total Motions: ' + boots.totalMotions, vec2(mainCanvasSize.x/2, mainCanvasSize.y/2+200), 60, new Color(1,0,0));
         }
         
     } else {
-        drawTextScreen('Level: ' + level, vec2(80, 40), 30, new Color(0,0,0));
-        drawTextScreen('Lives: ' + boots.lives, vec2(80, 70), 30, new Color(0,0,0));
-        drawTextScreen('Motions: ' + boots.motions, vec2(80, 100), 30, new Color(0,0,0));
-        drawTextScreen('Total Motions: ' + boots.totalMotions, vec2(110, 130), 30, new Color(0,0,0));
+        drawTextScreen('Level: ' + level, vec2(80, 40), 30, BLACK);
+        drawTextScreen('Lives: ' + boots.lives, vec2(80, 70), 30, BLACK);
+        if (timer.active()) {
+            drawTextScreen('Timer: ' + formatTime(abs(timer.get())), vec2(80, 100), 30, BLACK);
+        } else {
+            drawTextScreen('Timer: ' + formatTime(initialTime), vec2(80, 100), 30, BLACK);
+        }
+        
+        //drawTextScreen('Motions: ' + boots.motions, vec2(80, 100), 30, new Color(0,0,0));
+        //drawTextScreen('Total Motions: ' + boots.totalMotions, vec2(110, 130), 30, new Color(0,0,0));
     }
 }
 
