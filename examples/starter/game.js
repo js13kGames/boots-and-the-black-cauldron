@@ -72,6 +72,18 @@ class Boots extends EngineObject {
 
         for(var i=0;i<this.items.length;i++) {
             if(this.items[i].destroyTimer.elapsed()) {
+                if(this.items[i].displayName == 'Rabbit Foot') {
+                    this.speed = .1;
+                }
+                if(this.items[i].displayName == 'Clover') {
+                    this.health = 1;
+                }
+                if(this.items[i].displayName == 'Salt') {
+                    this.speed = .1;
+                }
+                if(this.items[i].displayName == 'Catnip') {
+                    this.speed = .1;
+                }
                 this.items.splice(i, 1);
             }
         }
@@ -83,6 +95,21 @@ class Boots extends EngineObject {
     addItem(item) {
         item.destroyTimer.set(5);
         this.items.push(item);
+        if(item.displayName == 'Rabbit Foot') {
+            this.speed = .2;
+        }
+
+        if(item.displayName == 'Clover') {
+            this.health = 200;
+        }
+
+        if(item.displayName == 'Salt') {
+            this.speed = .05;
+        }
+
+        if(item.displayName == 'Catnip') {
+            this.speed = .8;
+        }
     }
 
     cleanUpItems() {
