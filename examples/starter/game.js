@@ -7,7 +7,7 @@
 
 'use strict';
 
-let gameStarted, gameOver, level, timer, initialTime, clickTimer, exit, boots, witches;
+let gameStarted, gameOver, level, timer, initialTime, clickTimer, exit, boots, witches, items;
 
 // sound effects
 const new_game_sound = new Sound([1.1,,378,.03,.06,.18,1,2.2,,,105,.08,,,,.1,,.59,.02]); // Pickup 10
@@ -15,6 +15,8 @@ const player_hit_sound = new Sound([,,389,.03,.02,.04,1,2.5,-1,-1,,,,,129,,,.54,
 const exit_sound = new Sound([,,163,.07,.25,.22,,3.5,2,158,,,.06,,,,,.69,.18,.1,-948]); // Powerup 2
 const game_over_sound = new Sound([2,,62,.03,.01,.46,3,0,,,,,,1.8,,.3,.47,.43,.16]); // Explosion 11
 const tick_sound = new Sound([3,,12,.03,.04,.009,,1.7,-2,,4,.02,,,,,.49,.87,.01,.25]); // Blip 20
+const buff_sound = new Sound([,,118,.05,.24,.3,,1.1,-10,,,,.1,,,,,.99,.12]); // Powerup 30
+const debuff_sound = new Sound([,,188,.03,.05,.19,3,3.5,,,,,.05,1.4,,.1,,.97,.04,.36]); // Hit 33
 
 // game variables
 let particleEmitter;
@@ -44,6 +46,8 @@ class Boots extends EngineObject {
         this.frameOffset = 0;
         this.maxFrames = 0;
         this.drawSize = vec2(1,1);
+
+        this.items = [];
     }
 
     update() {
@@ -66,11 +70,39 @@ class Boots extends EngineObject {
             this.motions += 1;
         }
 
+        for(var i=0;i<this.items.length;i++) {
+            if(this.items[i].destroyTimer.elapsed()) {
+                this.items.splice(i, 1);
+            }
+        }
+
         //cameraPos = this.pos;
         super.update();
     }
 
+    addItem(item) {
+        item.destroyTimer.set(5);
+        this.items.push(item);
+    }
+
+    cleanUpItems() {
+        for (let i=0;i<this.items.length;i++) {
+            this.items[i].destroy();
+        }
+    }
+
     collideWithObject(o) {
+        if(o instanceof Item) {
+            this.addItem(o);
+
+            if(o.type == ItemType.BUFF) {
+                buff_sound.play();
+            } else {
+                debuff_sound.play();
+            }
+            o.destroy();
+        }
+
         if(o instanceof Witch) {
             this.takeDamage(o.damage);
         }
@@ -123,6 +155,56 @@ class Witch extends EngineObject {
     }
 }
 
+const ItemType = {
+    BUFF: 0,
+    DEBUFF: 1,
+}
+
+const ItemName = {
+    CLOVER: 0,
+    RABBIT_FOOT: 1,
+    SALT: 2,
+    CATNIP: 3,
+}
+
+class Item extends EngineObject {
+    constructor(pos, type, itemName) {
+        super(pos, vec2(1,1));
+        if(itemName == ItemName.CLOVER || itemName == ItemName.RABBIT_FOOT) {
+            this.color = GREEN;
+        } else {
+            this.color = RED;
+        }
+
+        this.type = type;
+        this.itemName = itemName;
+        this.displayName = '';
+
+        if(itemName == ItemName.CLOVER) {
+            this.displayName = "Clover";
+        }
+        if(itemName == ItemName.RABBIT_FOOT) {
+            this.displayName = "Rabbit Foot";
+        }
+        if(itemName == ItemName.SALT) {
+            this.displayName = "Salt";
+        }
+        if(itemName == ItemName.CATNIP) {
+            this.displayName = "Catnip";
+        }
+        this.destroyTimer = new Timer(5);
+        this.destroyTimer.unset();
+        this.setCollision();
+        this.mass = 0;
+    }
+
+    update() {
+        if(this.destroyTimer.elapsed()) {
+            destroy();
+        }
+    }
+}
+
 class Exit extends EngineObject {
     constructor(pos) {
         super(pos, vec2(2,2));
@@ -130,14 +212,15 @@ class Exit extends EngineObject {
         this.setCollision();
         this.mass = 0;
     }
+}
 
-    update() {
-        super.update();
-    }
+function spawn_object() {
+    items.push(new Item(vec2(randInt(levelSize.x),randInt(levelSize.y)), randInt(0,Object.keys(ItemType).length), randInt(0,Object.keys(ItemName).length)));
 }
 
 function newGame() {
     cleanUpWitches();
+    cleanUpItems();
     new_game_sound.play();
     gameStarted = true;
     gameOver = false;
@@ -160,6 +243,8 @@ function goToNextLevel() {
     exit.pos = vec2(randInt(levelSize.x),randInt(levelSize.y));
 
     witches.push(new Witch(vec2(randInt(levelSize.x),randInt(levelSize.y))));
+    cleanUpItems();
+    spawn_object();
     
     reset_timer();
     timer.unset();
@@ -169,6 +254,7 @@ function goToNextLevel() {
 
 function die() {
     boots.velocity = vec2(0,0);
+    boots.items = [];
     boots.state = 'idle';
     boots.lives -= 1;
 
@@ -201,6 +287,12 @@ function cleanUpWitches() {
     }
 }
 
+function cleanUpItems() {
+    for (let i=0;i<items.length;i++) {
+        items[i].destroy();
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 function gameInit()
 {
@@ -216,6 +308,7 @@ function gameInit()
     gameOver = false;
 
     witches = [];
+    items = [];
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -275,6 +368,12 @@ function gameRenderPost()
         } else {
             drawTextScreen('Timer: ' + formatTime(initialTime), vec2(80, 100), 30, BLACK);
         }
+        var itemsHeld = '';
+        for(var i=0;i<boots.items.length;i++) {
+            itemsHeld += boots.items[i].displayName + ', ';
+        }
+        drawTextScreen('Items: ' + itemsHeld, vec2(80, 130), 30, BLACK);
+        
         
         //drawTextScreen('Motions: ' + boots.motions, vec2(80, 100), 30, new Color(0,0,0));
         //drawTextScreen('Total Motions: ' + boots.totalMotions, vec2(110, 130), 30, new Color(0,0,0));
