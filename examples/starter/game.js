@@ -242,7 +242,7 @@ class Exit extends EngineObject {
 }
 
 function spawn_object() {
-    items.push(new Item(vec2(randInt(levelSize.x),randInt(levelSize.y)), randInt(0,Object.keys(ItemType).length), randInt(0,Object.keys(ItemName).length)));
+    items.push(new Item(vec2(randInt(levelSize.x),randInt(5, levelSize.y)), randInt(0,Object.keys(ItemType).length), randInt(0,Object.keys(ItemName).length)));
 }
 
 function newGame() {
@@ -266,10 +266,10 @@ function goToNextLevel() {
     boots.velocity = vec2(0,0);
     boots.state = 'idle';
 
-    boots.pos = vec2(randInt(levelSize.x),randInt(levelSize.y));
-    exit.pos = vec2(randInt(levelSize.x),randInt(levelSize.y));
+    boots.pos = vec2(randInt(1, 6),randInt(1, 6));
+    exit.pos = vec2(randInt(levelSize.x),randInt(5, levelSize.y));
 
-    witches.push(new Witch(vec2(randInt(levelSize.x),randInt(levelSize.y))));
+    witches.push(new Witch(vec2(randInt(levelSize.x),randInt(5, levelSize.y))));
     cleanUpItems();
     spawn_object();
     
@@ -291,7 +291,7 @@ function die() {
         game_over();
     }
 
-    boots.pos = vec2(randInt(levelSize.x),randInt(levelSize.y));
+    boots.pos = vec2(randInt(1, 6),randInt(1, 6));
     reset_timer();
 }
 
