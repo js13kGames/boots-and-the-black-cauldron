@@ -11,8 +11,9 @@ const BUILD_FOLDER = 'build';
 const sourceFiles =
 [
     '../../dist/littlejs.release.js',
-    'game.js',
     'player-small.js',
+    'title_song.js',
+    'game.js',
     // add your game's files here
 ];
 const dataFiles =

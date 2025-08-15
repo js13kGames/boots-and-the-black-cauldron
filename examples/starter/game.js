@@ -18,16 +18,84 @@ const tick_sound = new Sound([3,,12,.03,.04,.009,,1.7,-2,,4,.02,,,,,.49,.87,.01,
 const buff_sound = new Sound([,,118,.05,.24,.3,,1.1,-10,,,,.1,,,,,.99,.12]); // Powerup 30
 const debuff_sound = new Sound([,,188,.03,.05,.19,3,3.5,,,,,.05,1.4,,.1,,.97,.04,.36]); // Hit 33
 
+// music section
+let audio = document.createElement("audio");
+audio.loop = true;
+audio.volume = 1.0;
+let msc_title_src;
+
 // game variables
 let particleEmitter;
 
+// Initialize music generation (player).
+var t0 = new Date();
 var title_player = new CPlayer();
+title_player.init(title_song);
+
+// Generate music...
+var title_done = false;
+setInterval(function () {
+    if (title_done) {
+      return;
+    }
+
+    title_done = title_player.generate() >= 1;
+
+    if (title_done) {
+      var t1 = new Date();
+      console.log("msc title generate done (" + (t1 - t0) + "ms)");
+
+      // Put the generated song in an Audio element.
+      var wave = title_player.createWave();
+      msc_title_src = URL.createObjectURL(new Blob([wave], {type: "audio/wav"}));
+
+      play_music("title");
+    }
+});
 
 // webgl can be disabled to save even more space
 //glEnable = false;
 objectDefaultDamping = .7;
 
 const levelSize = vec2(40, 22);
+
+function play_sound(type) {
+    snd.currentTime = 0.0;
+
+    if(type == "wave_start") {
+        snd.volume = 0.3;
+        snd.src = snd_wave_start_src;
+
+        snd.play();
+    }
+    
+}
+
+function play_music(type) {
+    audio.pause();
+    audio.currentTime = 0.0;
+
+    if(type == "title") {
+        console.log("title music");
+        audio.volume = 0.3;
+        audio.src = msc_title_src;
+    }
+
+    audio.play();
+}
+
+function toggle_music() {
+    if(audio.paused) {
+        audio.play();
+    } else {
+        audio.pause();
+    }
+}
+
+function stop_music(type) {
+    audio.pause();
+    audio.currentTime = 0.0;
+}
 
 class Boots extends EngineObject {
     constructor(pos) {
@@ -346,6 +414,7 @@ function gameUpdate()
     if(mouseWasPressed(0) || keyWasPressed('Space') || gamepadWasPressed(0) || gamepadWasPressed(1)) {
         if(!gameStarted || gameOver) {
             newGame();
+            stop_music();
         }
     }
 
