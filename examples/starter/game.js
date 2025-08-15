@@ -107,6 +107,7 @@ class Boots extends EngineObject {
         this.lives = 9;
         this.speed = .1;
         this.state = 'idle';
+        this.mode = 'action';
         this.motions = 0;
         this.totalMotions = 0;
         this.damage = 1;
@@ -119,23 +120,67 @@ class Boots extends EngineObject {
     }
 
     update() {
-        // movement control
-        this.moveInput = isUsingGamepad ? gamepadStick(0) : keyDirection();
-        this.velocity = this.velocity.add(this.moveInput.clampLength(1).scale(this.speed)); // clamp and scale input
 
-        if(this.velocity.length() < 0.2 && this.state != 'idle') {
-            this.state = 'idle';
-            this.motions += 1;
+        if(this.mode == 'puzzle') {
+            // movement control (puzzle) grid based
+            this.move = vec2(0,0);
+
+            if(gamepadWasPressed(14)) {
+                this.move = vec2(-1,0);
+            }
+            if(gamepadWasPressed(15)) {
+                this.move = vec2(1,0);
+            } 
+            if(gamepadWasPressed(12)) {
+                this.move = vec2(0,1);
+            } 
+            if(gamepadWasPressed(13)) {
+                this.move = vec2(0,-1);
+            }
+
+            if(keyWasPressed('ArrowLeft')) {
+                this.move = vec2(-1,0);
+            }
+            if(keyWasPressed('ArrowRight')) {
+                this.move = vec2(1,0);
+            } 
+            if(keyWasPressed('ArrowUp')) {
+                this.move = vec2(0,1);
+            } 
+            if(keyWasPressed('ArrowDown')) {
+                this.move = vec2(0,-1);
+            }
+
+            this.pos = this.pos.add(this.move);
+        }
+        
+        if(this.mode == 'action') {
+            // movement control (puzzle)
+            this.moveInput = isUsingGamepad ? gamepadStick(0) : keyDirection();
+            this.velocity = this.velocity.add(this.moveInput.clampLength(1).scale(this.speed)); // clamp and scale input
+
+            if(this.velocity.length() < 0.2 && this.state != 'idle') {
+                this.state = 'idle';
+                this.motions += 1;
+            }
+
+            if(this.velocity.length() > 0.2 && this.state != 'walking') {
+                if(!timer.active()) {
+                    timer.set(initialTime);
+                    clickTimer.set(1);
+                    tick_sound.play();
+                }
+                this.state = 'walking';
+                this.motions += 1;
+            }
         }
 
-        if(this.velocity.length() > 0.2 && this.state != 'walking') {
-            if(!timer.active()) {
-                timer.set(initialTime);
-                clickTimer.set(1);
-                tick_sound.play();
+        if(keyWasPressed('KeyM')) {
+            if(this.mode == 'action') {
+                this.mode = 'puzzle';
+            } else {
+                this.mode = 'action';
             }
-            this.state = 'walking';
-            this.motions += 1;
         }
 
         for(var i=0;i<this.items.length;i++) {
