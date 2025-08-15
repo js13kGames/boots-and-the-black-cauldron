@@ -282,6 +282,8 @@ function goToNextLevel() {
 function die() {
     boots.velocity = vec2(0,0);
     boots.items = [];
+    boots.speed = .1
+    boots.health = 1;
     boots.state = 'idle';
     boots.lives -= 1;
 
