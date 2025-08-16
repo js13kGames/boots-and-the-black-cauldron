@@ -7,7 +7,7 @@
 
 'use strict';
 
-let gameStarted, gameOver, level, timer, initialTime, clickTimer, exit, boots, witches, items;
+let gameStarted, gameOver, level, timer, initialTime, clickTimer, exit, boots, witches, items, screenFadingFromBlack, screenAlpha, alph, fadeTime;
 
 // sound effects
 const new_game_sound = new Sound([1.1,,378,.03,.06,.18,1,2.2,,,105,.08,,,,.1,,.59,.02]); // Pickup 10
@@ -107,7 +107,8 @@ class Boots extends EngineObject {
         this.lives = 9;
         this.speed = .1;
         this.state = 'idle';
-        this.mode = 'action';
+        this.mode = 'puzzle';
+        this.moving = false;
         this.motions = 0;
         this.totalMotions = 0;
         this.damage = 1;
@@ -151,6 +152,13 @@ class Boots extends EngineObject {
                 this.move = vec2(0,-1);
             }
 
+            if(this.move.length() > 0) {
+                this.motions += 1;
+                this.moving = true;
+            } else {
+                this.moving = false;
+            }
+
             this.pos = this.pos.add(this.move);
         }
         
@@ -181,6 +189,10 @@ class Boots extends EngineObject {
             } else {
                 this.mode = 'action';
             }
+        }
+
+        if(keyWasPressed('KeyF')) {
+            screenFadingFromBlack = true;
         }
 
         for(var i=0;i<this.items.length;i++) {
@@ -277,19 +289,40 @@ class Witch extends EngineObject {
     }
 
     update() {
-        if(this.travelingHome) {
-            if(this.pos.distance(this.home) < 1) {
-                this.travelingHome = false;
+        if(boots.mode == 'action') {
+            if(this.travelingHome) {
+                if(this.pos.distance(this.home) < 1) {
+                    this.travelingHome = false;
+                } else {
+                    this.velocity = this.velocity.add(this.home.subtract(this.pos).normalize().scale(.1));
+                }
             } else {
-                this.velocity = this.velocity.add(this.home.subtract(this.pos).normalize().scale(.1));
+                if(this.pos.distance(this.travelTarget) < 1) {
+                    this.travelingHome = true;
+                } else {
+                    this.velocity = this.velocity.add(this.travelTarget.subtract(this.pos).normalize().scale(.1));
+                }
             }
         } else {
-            if(this.pos.distance(this.travelTarget) < 1) {
-                this.travelingHome = true;
+            if(this.travelingHome) {
+                if(this.pos.distance(this.home) < 1) {
+                    this.travelingHome = false;
+                } else {
+                    if(boots.moving) {
+                        this.pos = this.pos.add(this.home.subtract(this.pos).normalize());
+                    }
+                }
             } else {
-                this.velocity = this.velocity.add(this.travelTarget.subtract(this.pos).normalize().scale(.1));
+                if(this.pos.distance(this.travelTarget) < 1) {
+                    this.travelingHome = true;
+                } else {
+                    if(boots.moving) {
+                        this.pos = this.pos.add(this.travelTarget.subtract(this.pos).normalize());
+                    }
+                }
             }
         }
+        
 
         super.update();
     }
@@ -374,10 +407,14 @@ function newGame() {
 
 function goToNextLevel() {
     level += 1;
-    boots.totalMotions += boots.motions;
-    boots.motions = 0;
     boots.velocity = vec2(0,0);
     boots.state = 'idle';
+
+    if(boots.mode == 'action') {
+        boots.mode = 'puzzle';
+    } else {
+        boots.mode = 'action';
+    }
 
     boots.pos = vec2(randInt(1, 6),randInt(1, 6));
     exit.pos = vec2(randInt(levelSize.x),randInt(5, levelSize.y));
@@ -386,9 +423,16 @@ function goToNextLevel() {
     cleanUpItems();
     spawn_object();
     
-    reset_timer();
-    timer.unset();
-    clickTimer.unset();
+    if(boots.mode == 'action') {
+        reset_timer();
+        timer.unset();
+        clickTimer.unset();
+    } else {
+        boots.totalMotions += boots.motions;
+        boots.motions = 0;
+    }
+    
+    screenFadingFromBlack = true;
     
 }
 
@@ -439,7 +483,10 @@ function cleanUpItems() {
 function gameInit()
 {
     canvasFixedSize = vec2(1280, 720);
-
+    screenFadingFromBlack = false;
+    screenAlpha = 1;
+    alph = screenAlpha;
+    fadeTime = 1;
     cameraPos = levelSize.scale(.5);
 
     initialTime = 5;
@@ -463,14 +510,17 @@ function gameUpdate()
         }
     }
 
-    if(gameStarted && clickTimer.elapsed()) {
-        tick_sound.play();
-        clickTimer.set(1);
-    }
+    if(boots != null && boots.mode == 'action') {
+        if(gameStarted && clickTimer.elapsed()) {
+            tick_sound.play();
+            clickTimer.set(1);
+        }
 
-    if(gameStarted && timer.elapsed()) {
-        die();
+        if(gameStarted && timer.elapsed()) {
+            die();
+        }
     }
+    
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -506,11 +556,17 @@ function gameRenderPost()
     } else {
         drawTextScreen('Level: ' + level, vec2(80, 40), 30, BLACK);
         drawTextScreen('Lives: ' + boots.lives, vec2(80, 70), 30, BLACK);
-        if (timer.active()) {
-            drawTextScreen('Timer: ' + formatTime(abs(timer.get())), vec2(80, 100), 30, BLACK);
+        
+        if(boots.mode == 'action') {
+            if (timer.active()) {
+                drawTextScreen('Timer: ' + formatTime(abs(timer.get())), vec2(80, 100), 30, BLACK);
+            } else {
+                drawTextScreen('Timer: ' + formatTime(initialTime), vec2(80, 100), 30, BLACK);
+            }
         } else {
-            drawTextScreen('Timer: ' + formatTime(initialTime), vec2(80, 100), 30, BLACK);
+            drawTextScreen('Motions: ' + boots.motions, vec2(80, 100), 30, new Color(0,0,0));
         }
+        
         var itemsHeld = '';
         for(var i=0;i<boots.items.length;i++) {
             itemsHeld += boots.items[i].displayName + ', ';
@@ -521,6 +577,18 @@ function gameRenderPost()
         //drawTextScreen('Motions: ' + boots.motions, vec2(80, 100), 30, new Color(0,0,0));
         //drawTextScreen('Total Motions: ' + boots.totalMotions, vec2(110, 130), 30, new Color(0,0,0));
     }
+
+    if(screenFadingFromBlack) {
+        
+        drawRect(cameraPos, levelSize, new Color(0,0,0,alph));
+        alph -= 1/(60*fadeTime);
+
+        if(alph <= 0) {
+            screenFadingFromBlack = false;
+            alph = screenAlpha;
+        }
+    }
+    
 }
 
 ///////////////////////////////////////////////////////////////////////////////
