@@ -109,8 +109,13 @@ class Boots extends EngineObject {
         this.state = 'idle';
         this.mode = 'puzzle';
         this.moving = false;
+        this.minMotions = 50;
+        this.maxMotions = 60;
+        this.motionsThisLevel = 0;
         this.motions = 0;
         this.totalMotions = 0;
+        this.levelTimerAdd = 0;
+        this.levelMotionsAdd = 0;
         this.damage = 1;
         this.currentFrame = 0;
         this.frameOffset = 0;
@@ -153,7 +158,7 @@ class Boots extends EngineObject {
             }
 
             if(this.move.length() > 0) {
-                this.motions += 1;
+                this.motions -= 1;
                 this.moving = true;
             } else {
                 this.moving = false;
@@ -174,12 +179,12 @@ class Boots extends EngineObject {
 
             if(this.velocity.length() > 0.2 && this.state != 'walking') {
                 if(!timer.active()) {
-                    timer.set(initialTime);
+                    timer.set(initialTime + this.levelTimerAdd);
                     clickTimer.set(1);
                     tick_sound.play();
                 }
                 this.state = 'walking';
-                this.motions += 1;
+                this.motions -= 1;
             }
         }
 
@@ -424,12 +429,18 @@ function goToNextLevel() {
     spawn_object();
     
     if(boots.mode == 'action') {
+        boots.levelTimerAdd = boots.motions;
+
         reset_timer();
         timer.unset();
         clickTimer.unset();
     } else {
+        boots.levelMotionsAdd = Math.ceil(timer.get());
+
         boots.totalMotions += boots.motions;
-        boots.motions = 0;
+        boots.motions = randInt(boots.minMotions, boots.maxMotions+1);
+
+        boots.motionsThisLevel = boots.motions + boots.levelMotionsAdd;
     }
     
     screenFadingFromBlack = true;
@@ -449,7 +460,12 @@ function die() {
     }
 
     boots.pos = vec2(randInt(1, 6),randInt(1, 6));
-    reset_timer();
+    if(boots.mode == 'action') {
+        reset_timer();
+    } else {
+        boots.motions = boots.motionsThisLevel;
+    }
+    
 }
 
 function game_over() {
@@ -461,7 +477,7 @@ function game_over() {
 }
 
 function reset_timer() {
-    timer = new Timer(initialTime);
+    timer = new Timer(initialTime + boots.levelTimerAdd);
     timer.unset();
     clickTimer = new Timer(1);
     clickTimer.unset();
@@ -519,6 +535,10 @@ function gameUpdate()
         if(gameStarted && timer.elapsed()) {
             die();
         }
+    } else {
+        if(gameStarted && boots.motions < 1) {
+            die();
+        }
     }
     
 }
@@ -561,7 +581,7 @@ function gameRenderPost()
             if (timer.active()) {
                 drawTextScreen('Timer: ' + formatTime(abs(timer.get())), vec2(80, 100), 30, BLACK);
             } else {
-                drawTextScreen('Timer: ' + formatTime(initialTime), vec2(80, 100), 30, BLACK);
+                drawTextScreen('Timer: ' + formatTime(initialTime + boots.levelTimerAdd), vec2(80, 100), 30, BLACK);
             }
         } else {
             drawTextScreen('Motions: ' + boots.motions, vec2(80, 100), 30, new Color(0,0,0));
