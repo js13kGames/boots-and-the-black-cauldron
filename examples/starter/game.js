@@ -22,7 +22,7 @@ const debuff_sound = new Sound([,,188,.03,.05,.19,3,3.5,,,,,.05,1.4,,.1,,.97,.04
 let audio = document.createElement("audio");
 audio.loop = true;
 audio.volume = 1.0;
-let msc_title_src;
+let msc_title_src, msc_puzzle_src;
 
 // game variables
 let particleEmitter;
@@ -53,6 +53,28 @@ setInterval(function () {
     }
 });
 
+var puzzle_player = new CPlayer();
+puzzle_player.init(puzzle_song);
+
+// Generate music...
+var puzzle_done = false;
+setInterval(function () {
+    if (puzzle_done) {
+      return;
+    }
+
+    puzzle_done = puzzle_player.generate() >= 1;
+
+    if (puzzle_done) {
+      var t1 = new Date();
+      console.log("msc puzzle generate done (" + (t1 - t0) + "ms)");
+
+      // Put the generated song in an Audio element.
+      var wave = puzzle_player.createWave();
+      msc_puzzle_src = URL.createObjectURL(new Blob([wave], {type: "audio/wav"}));
+    }
+});
+
 // webgl can be disabled to save even more space
 //glEnable = false;
 objectDefaultDamping = .7;
@@ -72,13 +94,17 @@ function play_sound(type) {
 }
 
 function play_music(type) {
+    console.log("Switching track to " + type);
     audio.pause();
     audio.currentTime = 0.0;
 
     if(type == "title") {
-        console.log("title music");
         audio.volume = 0.3;
         audio.src = msc_title_src;
+    }
+    if(type == "puzzle") {
+        audio.volume = 0.3;
+        audio.src = msc_puzzle_src;
     }
 
     audio.play();
@@ -427,6 +453,8 @@ function goToNextLevel() {
     witches.push(new Witch(vec2(randInt(levelSize.x),randInt(5, levelSize.y))));
     cleanUpItems();
     spawn_object();
+
+
     
     if(boots.mode == 'action') {
         boots.levelTimerAdd = boots.motions;
@@ -434,6 +462,8 @@ function goToNextLevel() {
         reset_timer();
         timer.unset();
         clickTimer.unset();
+
+        toggle_music();
     } else {
         boots.levelMotionsAdd = Math.ceil(timer.get());
 
@@ -441,6 +471,8 @@ function goToNextLevel() {
         boots.motions = randInt(boots.minMotions, boots.maxMotions+1);
 
         boots.motionsThisLevel = boots.motions + boots.levelMotionsAdd;
+
+        toggle_music();
     }
     
     screenFadingFromBlack = true;
@@ -523,6 +555,7 @@ function gameUpdate()
         if(!gameStarted || gameOver) {
             newGame();
             stop_music();
+            audio.src = msc_puzzle_src;
         }
     }
 
