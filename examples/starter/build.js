@@ -22,7 +22,6 @@ const sourceFiles =
 ];
 const dataFiles =
 [
-    'tiles.png',
     // add your game's data files here
 ];
 
@@ -131,7 +130,7 @@ function htmlBuildStep(filename)
 function zipBuildStep(filename)
 {
     console.log(`Zipping...`);
-    const ect = '../../../node_modules/ect-bin/vendor/win32/ect.exe';
+    const ect = '../../../node_modules/ect-bin/vendor/linux/ect';
     const args = ['-9', '-strip', '-zip', `../${PROGRAM_NAME}.zip`, 'index.html', ...dataFiles];
     child_process.spawnSync(ect, args, {stdio: 'inherit', cwd: BUILD_FOLDER});
 };

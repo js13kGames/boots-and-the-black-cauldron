@@ -17,6 +17,7 @@ const game_over_sound = new Sound([2,,62,.03,.01,.46,3,0,,,,,,1.8,,.3,.47,.43,.1
 const tick_sound = new Sound([3,,12,.03,.04,.009,,1.7,-2,,4,.02,,,,,.49,.87,.01,.25]); // Blip 20
 const buff_sound = new Sound([,,118,.05,.24,.3,,1.1,-10,,,,.1,,,,,.99,.12]); // Powerup 30
 const debuff_sound = new Sound([,,188,.03,.05,.19,3,3.5,,,,,.05,1.4,,.1,,.97,.04,.36]); // Hit 33
+const key_pickup_sound = new Sound([1.8,,438,.09,.29,.38,,2,,,462,.09,.04,,,.1,.06,.56,.18,.15,152]); // Powerup 58
 
 // music section
 let audio = document.createElement("audio");
@@ -200,7 +201,7 @@ function stop_music(type) {
 
 class Boots extends EngineObject {
     constructor(pos) {
-        super(pos, vec2(1,1), spriteAtlas.boots);
+        super(pos, vec2(1,1));
         this.color = BLACK;
         this.setCollision();
         this.mass = 1;
@@ -272,6 +273,7 @@ class Boots extends EngineObject {
                     console.log(portals[i].teleportTo);
                     if(portals[i].teleportTo != null) {
                         boots.pos = vec2(portals[i].teleportTo.pos);
+                        play_sound("mirror");
                     }
                 }
             }
@@ -331,8 +333,12 @@ class Boots extends EngineObject {
     }
 
     addItem(item) {
-        item.destroyTimer.set(5);
+        if(item.displayName != 'Key') {
+            item.destroyTimer.set(5);
+        }
+        
         this.items.push(item);
+
         if(item.displayName == 'Rabbit Foot') {
             this.speed = .2;
         }
@@ -350,21 +356,50 @@ class Boots extends EngineObject {
         }
     }
 
+    hasItem(itemName) {
+        for (let i=0;i<this.items.length;i++) {
+            if(this.items[i].itemName = itemName) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    destroyItem(itemName) {
+        for (let i=0;i<this.items.length;i++) {
+            if(this.items[i].itemName == itemName) {
+                this.items[i].destroy();
+                this.items.splice(i, 1);
+                break;
+            }
+        }
+    }
+
     cleanUpItems() {
         for (let i=0;i<this.items.length;i++) {
-            this.items[i].destroy();
+            if(this.items[i].itemName != ItemName.KEY) {
+                this.items[i].destroy();
+                this.items.splice(i, 1);
+            }
         }
     }
 
     collideWithObject(o) {
         if(o instanceof Item) {
             this.addItem(o);
+            console.log(o);
 
-            if(o.type == ItemType.BUFF) {
-                buff_sound.play();
+            if(o.itemName == ItemName.KEY){
+                key_pickup_sound.play();
             } else {
-                debuff_sound.play();
+                if(o.type == ItemType.BUFF) {
+                    buff_sound.play();
+                } else {
+                    debuff_sound.play();
+                }
             }
+            
             o.destroy();
         }
 
@@ -375,14 +410,19 @@ class Boots extends EngineObject {
         if(o instanceof MirrorPortal) {
             console.log(o.teleportTo);
             if(o.teleportTo != null) {
-                boots.pos = vec2(o.teleportTo.pos);
+                this.pos = vec2(o.teleportTo.pos);
+                play_sound("mirror");
             }
         }
 
         if(o instanceof Exit) {
-            exit_sound.play(null, 1, 1, 1.8);
-            goToNextLevel();
-
+            if(this.hasItem(ItemName.KEY)) {
+                if(this.mode == "action") {
+                    this.destroyItem(ItemName.KEY);
+                }
+                exit_sound.play(null, 1, 1, 1.8);
+                goToNextLevel();
+            }
         }
     }
 
@@ -398,7 +438,7 @@ class Boots extends EngineObject {
 
 class Witch extends EngineObject {
     constructor(pos) {
-        super(pos, vec2(1,2), spriteAtlas.priest);
+        super(pos, vec2(1,2));
         this.color = PURPLE;
         this.setCollision();
         this.mass = 1;
@@ -407,6 +447,7 @@ class Witch extends EngineObject {
         this.travelTarget = this.pos.add(vec2(randInt(-this.travelDistance, this.travelDistance), randInt(-this.travelDistance, this.travelDistance)));
         this.home = vec2(this.pos.x, this.pos.y);
         this.travelingHome = false;
+        this.visible = true;
     }
 
     update() {
@@ -447,6 +488,12 @@ class Witch extends EngineObject {
 
         super.update();
     }
+
+    render() {
+        if(this.visible) {
+            super.render();
+        }
+    }
 }
 
 const ItemType = {
@@ -459,6 +506,7 @@ const ItemName = {
     RABBIT_FOOT: 1,
     SALT: 2,
     CATNIP: 3,
+    KEY: 4,
 }
 
 class Item extends EngineObject {
@@ -466,6 +514,8 @@ class Item extends EngineObject {
         super(pos, vec2(1,1));
         if(itemName == ItemName.CLOVER || itemName == ItemName.RABBIT_FOOT) {
             this.color = GREEN;
+        } else if(itemName == ItemName.KEY) {
+            this.color = YELLOW;
         } else {
             this.color = RED;
         }
@@ -486,6 +536,9 @@ class Item extends EngineObject {
         if(itemName == ItemName.CATNIP) {
             this.displayName = "Catnip";
         }
+        if(itemName == ItemName.KEY) {
+            this.displayName = "Key";
+        }
         this.destroyTimer = new Timer(5);
         this.destroyTimer.unset();
         this.setCollision();
@@ -501,7 +554,7 @@ class Item extends EngineObject {
 
 class Exit extends EngineObject {
     constructor(pos) {
-        super(pos, vec2(2,2), spriteAtlas.hut);
+        super(pos, vec2(2,2));
         this.color = BLUE;
         this.setCollision();
         this.mass = 0;
@@ -523,8 +576,13 @@ class MirrorPortal extends EngineObject {
     }
 }
 
-function spawn_object() {
-    items.push(new Item(vec2(randInt(levelSize.x),randInt(5, levelSize.y)), randInt(0,Object.keys(ItemType).length), randInt(0,Object.keys(ItemName).length)));
+function spawn_object(name=null) {
+    if(name == null || name == "") {
+        items.push(new Item(vec2(randInt(levelSize.x),randInt(5, levelSize.y)), randInt(0,Object.keys(ItemType).length), randInt(0,Object.keys(ItemName).length-1)));
+    } else {
+        items.push(new Item(vec2(randInt(levelSize.x),randInt(5, levelSize.y)), randInt(0,Object.keys(ItemType).length), name));
+    }
+    
 }
 
 function newGame() {
@@ -536,6 +594,9 @@ function newGame() {
     level = 0;
 
     boots = new Boots();
+    var i = new Item(vec2(0,0), ItemType.BUFF, ItemName.KEY);
+    boots.items.push(i);
+    i.destroy();
     exit = new Exit();
 
     goToNextLevel();
@@ -557,7 +618,7 @@ function goToNextLevel() {
     boots.pos = vec2(randInt(1, 6),randInt(1, 6));
     exit.pos = vec2(randInt(levelSize.x),randInt(5, levelSize.y));
 
-    witches.push(new Witch(vec2(randInt(levelSize.x),randInt(5, levelSize.y))));
+    
     portals.push(new MirrorPortal(vec2(randInt(levelSize.x),randInt(5, levelSize.y))));
     portals.push(new MirrorPortal(vec2(randInt(levelSize.x),randInt(5, levelSize.y))));
     if(portals[1].pos.distance(exit.pos) > portals[0].pos.distance(exit.pos)) {
@@ -570,6 +631,9 @@ function goToNextLevel() {
     spawn_object();
     
     if(boots.mode == 'action') {
+        toggleWitches("action");
+        witches.push(new Witch(vec2(randInt(levelSize.x),randInt(5, levelSize.y))));
+
         boots.levelTimerAdd = boots.motions;
 
         reset_timer();
@@ -585,6 +649,10 @@ function goToNextLevel() {
 
         boots.motionsThisLevel = boots.motions + boots.levelMotionsAdd;
 
+        spawn_object(ItemName.KEY);
+
+        toggleWitches("puzzle");
+
         play_music("puzzle");
     }
     
@@ -594,7 +662,7 @@ function goToNextLevel() {
 
 function die() {
     boots.velocity = vec2(0,0);
-    boots.items = [];
+    boots.cleanUpItems();
     boots.speed = .1
     boots.health = 1;
     boots.state = 'idle';
@@ -636,6 +704,22 @@ function cleanUpWitches() {
     witches = [];
 }
 
+function toggleWitches(mode) {
+    if(mode == "action") {
+        for (let i=0;i<witches.length;i++) {
+            witches[i].visible = true;
+            witches[i].setCollision();
+        }
+    }
+
+    if(mode == "puzzle") {
+        for (let i=0;i<witches.length;i++) {
+            witches[i].visible = false;
+            witches[i].setCollision(false, false, false, false);
+        }
+    }
+}
+
 function cleanUpItems() {
     for (let i=0;i<items.length;i++) {
         items[i].destroy();
@@ -672,13 +756,13 @@ function gameInit()
     portals = [];
 
     // create a table of all sprites
-    spriteAtlas =
+    /*spriteAtlas =
     {
         // large tiles
         boots: tile(0,16),
         priest: new TileInfo(vec2(16,0), vec2(16,32)),
         hut: new TileInfo(vec2(32,0), vec2(64,64)),
-    }
+    }*/
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -688,7 +772,6 @@ function gameUpdate()
         if(!gameStarted || gameOver) {
             newGame();
             stop_music();
-            audio.src = msc_puzzle_src;
         }
     }
 
