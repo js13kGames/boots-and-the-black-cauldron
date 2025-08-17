@@ -7,7 +7,7 @@
 
 'use strict';
 
-let gameStarted, gameOver, level, timer, initialTime, clickTimer, exit, boots, witches, items, screenFadingFromBlack, screenAlpha, alph, fadeTime, portals;
+let gameStarted, spriteAtlas, gameOver, level, timer, initialTime, clickTimer, exit, boots, witches, items, screenFadingFromBlack, screenAlpha, alph, fadeTime, portals;
 
 // sound effects
 const new_game_sound = new Sound([1.1,,378,.03,.06,.18,1,2.2,,,105,.08,,,,.1,,.59,.02]); // Pickup 10
@@ -22,7 +22,7 @@ const debuff_sound = new Sound([,,188,.03,.05,.19,3,3.5,,,,,.05,1.4,,.1,,.97,.04
 let audio = document.createElement("audio");
 audio.loop = true;
 audio.volume = 1.0;
-let msc_title_src, msc_puzzle_src;
+let msc_title_src, msc_action_src, msc_puzzle_src, msc_gameover_src, snd_mirror_src;
 
 // game variables
 let particleEmitter;
@@ -53,6 +53,28 @@ setInterval(function () {
     }
 });
 
+var action_player = new CPlayer();
+action_player.init(action_song);
+
+// Generate music...
+var action_done = false;
+setInterval(function () {
+    if (action_done) {
+      return;
+    }
+
+    action_done = action_player.generate() >= 1;
+
+    if (action_done) {
+      var t1 = new Date();
+      console.log("msc action generate done (" + (t1 - t0) + "ms)");
+
+      // Put the generated song in an Audio element.
+      var wave = action_player.createWave();
+      msc_action_src = URL.createObjectURL(new Blob([wave], {type: "audio/wav"}));
+    }
+});
+
 var puzzle_player = new CPlayer();
 puzzle_player.init(puzzle_song);
 
@@ -75,6 +97,52 @@ setInterval(function () {
     }
 });
 
+var gameover_player = new CPlayer();
+gameover_player.init(gameover_song);
+
+var gameover_done = false;
+setInterval(function () {
+    if (gameover_done) {
+      return;
+    }
+
+    gameover_done = gameover_player.generate() >= 1;
+
+    if (gameover_done) {
+      var t1 = new Date();
+      console.log("msc gameover generate done (" + (t1 - t0) + "ms)");
+
+      // Put the generated song in an Audio element.
+      var wave = gameover_player.createWave();
+      msc_gameover_src = URL.createObjectURL(new Blob([wave], {type: "audio/wav"}));
+    }
+});
+
+let snd = document.createElement("audio");
+snd.loop = false;
+snd.volume = 1.0;
+
+var mirror_player = new CPlayer();
+mirror_player.init(mirror_song);
+
+var mirror_done = false;
+setInterval(function () {
+    if (mirror_done) {
+      return;
+    }
+
+    mirror_done = mirror_player.generate() >= 1;
+
+    if (mirror_done) {
+      var t1 = new Date();
+      console.log("snd mirror generate done (" + (t1 - t0) + "ms)");
+
+      // Put the generated song in an Audio element.
+      var wave = mirror_player.createWave();
+      snd_mirror_src = URL.createObjectURL(new Blob([wave], {type: "audio/wav"}));
+    }
+});
+
 // webgl can be disabled to save even more space
 //glEnable = false;
 objectDefaultDamping = .7;
@@ -84,13 +152,12 @@ const levelSize = vec2(40, 22);
 function play_sound(type) {
     snd.currentTime = 0.0;
 
-    if(type == "wave_start") {
+    if(type == "mirror") {
         snd.volume = 0.3;
-        snd.src = snd_wave_start_src;
+        snd.src = snd_mirror_src;
 
         snd.play();
     }
-    
 }
 
 function play_music(type) {
@@ -102,9 +169,17 @@ function play_music(type) {
         audio.volume = 0.3;
         audio.src = msc_title_src;
     }
+    if(type == "action") {
+        audio.volume = 0.3;
+        audio.src = msc_action_src;
+    }
     if(type == "puzzle") {
         audio.volume = 0.3;
         audio.src = msc_puzzle_src;
+    }
+    if(type == "gameover") {
+        audio.volume = 0.3;
+        audio.src = msc_gameover_src;
     }
 
     audio.play();
@@ -125,7 +200,7 @@ function stop_music(type) {
 
 class Boots extends EngineObject {
     constructor(pos) {
-        super(pos, vec2(1,1));
+        super(pos, vec2(1,1), spriteAtlas.boots);
         this.color = BLACK;
         this.setCollision();
         this.mass = 1;
@@ -323,7 +398,7 @@ class Boots extends EngineObject {
 
 class Witch extends EngineObject {
     constructor(pos) {
-        super(pos, vec2(1,1));
+        super(pos, vec2(1,2), spriteAtlas.priest);
         this.color = PURPLE;
         this.setCollision();
         this.mass = 1;
@@ -426,7 +501,7 @@ class Item extends EngineObject {
 
 class Exit extends EngineObject {
     constructor(pos) {
-        super(pos, vec2(2,2));
+        super(pos, vec2(2,2), spriteAtlas.hut);
         this.color = BLUE;
         this.setCollision();
         this.mass = 0;
@@ -501,7 +576,7 @@ function goToNextLevel() {
         timer.unset();
         clickTimer.unset();
 
-        toggle_music();
+        play_music("action");
     } else {
         boots.levelMotionsAdd = Math.ceil(timer.get());
 
@@ -510,7 +585,7 @@ function goToNextLevel() {
 
         boots.motionsThisLevel = boots.motions + boots.levelMotionsAdd;
 
-        toggle_music();
+        play_music("puzzle");
     }
     
     screenFadingFromBlack = true;
@@ -541,7 +616,7 @@ function die() {
 function game_over() {
     boots.destroy();
     exit.destroy();
-    game_over_sound.play();
+    play_music("gameover");
     gameOver = true;
     gameStarted = false;
 }
@@ -595,6 +670,15 @@ function gameInit()
     witches = [];
     items = [];
     portals = [];
+
+    // create a table of all sprites
+    spriteAtlas =
+    {
+        // large tiles
+        boots: tile(0,16),
+        priest: new TileInfo(vec2(16,0), vec2(16,32)),
+        hut: new TileInfo(vec2(32,0), vec2(64,64)),
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

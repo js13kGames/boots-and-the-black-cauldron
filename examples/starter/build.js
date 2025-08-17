@@ -13,7 +13,10 @@ const sourceFiles =
     '../../dist/littlejs.release.js',
     'player-small.js',
     'title_song.js',
+    'action_song.js',
     'puzzle_song.js',
+    'gameover_song.js',
+    'mirror_song.js',
     'game.js',
     // add your game's files here
 ];
@@ -128,7 +131,7 @@ function htmlBuildStep(filename)
 function zipBuildStep(filename)
 {
     console.log(`Zipping...`);
-    const ect = '../../../node_modules/ect-bin/vendor/linux/ect';
+    const ect = '../../../node_modules/ect-bin/vendor/win32/ect.exe';
     const args = ['-9', '-strip', '-zip', `../${PROGRAM_NAME}.zip`, 'index.html', ...dataFiles];
     child_process.spawnSync(ect, args, {stdio: 'inherit', cwd: BUILD_FOLDER});
 };
