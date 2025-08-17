@@ -7,7 +7,7 @@
 
 'use strict';
 
-let gameStarted, gameOver, level, timer, initialTime, clickTimer, exit, boots, witches, items, screenFadingFromBlack, screenAlpha, alph, fadeTime;
+let gameStarted, gameOver, level, timer, initialTime, clickTimer, exit, boots, witches, items, screenFadingFromBlack, screenAlpha, alph, fadeTime, portals;
 
 // sound effects
 const new_game_sound = new Sound([1.1,,378,.03,.06,.18,1,2.2,,,105,.08,,,,.1,,.59,.02]); // Pickup 10
@@ -191,6 +191,15 @@ class Boots extends EngineObject {
             }
 
             this.pos = this.pos.add(this.move);
+
+            for(var i=0;i<portals.length;i++) {
+                if(this.pos.x == portals[i].pos.x && this.pos.y == portals[i].pos.y) {
+                    console.log(portals[i].teleportTo);
+                    if(portals[i].teleportTo != null) {
+                        boots.pos = vec2(portals[i].teleportTo.pos);
+                    }
+                }
+            }
         }
         
         if(this.mode == 'action') {
@@ -200,7 +209,6 @@ class Boots extends EngineObject {
 
             if(this.velocity.length() < 0.2 && this.state != 'idle') {
                 this.state = 'idle';
-                this.motions += 1;
             }
 
             if(this.velocity.length() > 0.2 && this.state != 'walking') {
@@ -210,7 +218,6 @@ class Boots extends EngineObject {
                     tick_sound.play();
                 }
                 this.state = 'walking';
-                this.motions -= 1;
             }
         }
 
@@ -290,9 +297,17 @@ class Boots extends EngineObject {
             this.takeDamage(o.damage);
         }
 
+        if(o instanceof MirrorPortal) {
+            console.log(o.teleportTo);
+            if(o.teleportTo != null) {
+                boots.pos = vec2(o.teleportTo.pos);
+            }
+        }
+
         if(o instanceof Exit) {
             exit_sound.play(null, 1, 1, 1.8);
             goToNextLevel();
+
         }
     }
 
@@ -418,6 +433,21 @@ class Exit extends EngineObject {
     }
 }
 
+class MirrorPortal extends EngineObject {
+    constructor(pos) {
+        super(pos, vec2(1,1));
+        this.color = CYAN;
+        this.setCollision();
+        this.mass = 0;
+        this.teleportTo = null;
+        this.health = 1;
+    }
+
+    linkPortalTo(m) {
+        this.teleportTo = m;
+    }
+}
+
 function spawn_object() {
     items.push(new Item(vec2(randInt(levelSize.x),randInt(5, levelSize.y)), randInt(0,Object.keys(ItemType).length), randInt(0,Object.keys(ItemName).length)));
 }
@@ -441,6 +471,8 @@ function goToNextLevel() {
     boots.velocity = vec2(0,0);
     boots.state = 'idle';
 
+    cleanUpPortals();
+
     if(boots.mode == 'action') {
         boots.mode = 'puzzle';
     } else {
@@ -451,10 +483,16 @@ function goToNextLevel() {
     exit.pos = vec2(randInt(levelSize.x),randInt(5, levelSize.y));
 
     witches.push(new Witch(vec2(randInt(levelSize.x),randInt(5, levelSize.y))));
+    portals.push(new MirrorPortal(vec2(randInt(levelSize.x),randInt(5, levelSize.y))));
+    portals.push(new MirrorPortal(vec2(randInt(levelSize.x),randInt(5, levelSize.y))));
+    if(portals[1].pos.distance(exit.pos) > portals[0].pos.distance(exit.pos)) {
+        portals[1].linkPortalTo(portals[0]);
+    } else {
+        portals[0].linkPortalTo(portals[1]);
+    }
+    
     cleanUpItems();
     spawn_object();
-
-
     
     if(boots.mode == 'action') {
         boots.levelTimerAdd = boots.motions;
@@ -519,12 +557,22 @@ function cleanUpWitches() {
     for (let i=0;i<witches.length;i++) {
         witches[i].destroy();
     }
+
+    witches = [];
 }
 
 function cleanUpItems() {
     for (let i=0;i<items.length;i++) {
         items[i].destroy();
     }
+    items = [];
+}
+
+function cleanUpPortals() {
+    for (let i=0;i<portals.length;i++) {
+        portals[i].destroy();
+    }
+    portals = [];
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -546,6 +594,7 @@ function gameInit()
 
     witches = [];
     items = [];
+    portals = [];
 }
 
 ///////////////////////////////////////////////////////////////////////////////
