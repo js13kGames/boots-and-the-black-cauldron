@@ -7,7 +7,8 @@
 
 'use strict';
 
-let gameStarted, spriteAtlas, gameOver, level, timer, initialTime, clickTimer, exit, boots, witches, items, screenFadingFromBlack, screenAlpha, alph, fadeTime, portals;
+let gameStarted, spriteAtlas, gameOver, level, levelSize, timer, initialTime, clickTimer, exit, boots, screenFadingFromBlack, screenAlpha, alph, fadeTime;
+let witches, items, ingredients, portals, trees;
 
 // sound effects
 const new_game_sound = new Sound([1.1,,378,.03,.06,.18,1,2.2,,,105,.08,,,,.1,,.59,.02]); // Pickup 10
@@ -148,7 +149,9 @@ setInterval(function () {
 //glEnable = false;
 objectDefaultDamping = .7;
 
-const levelSize = vec2(40, 22);
+const actionLevelSize = vec2(80, 44);
+const puzzleLevelSize = vec2(40, 22);
+levelSize = actionLevelSize;
 
 function play_sound(type) {
     snd.currentTime = 0.0;
@@ -225,6 +228,7 @@ class Boots extends EngineObject {
         this.drawSize = vec2(1,1);
 
         this.items = [];
+        this.ingredients = [];
     }
 
     update() {
@@ -280,6 +284,9 @@ class Boots extends EngineObject {
         }
         
         if(this.mode == 'action') {
+            // move camera with player
+            cameraPos = this.pos;
+
             // movement control (puzzle)
             this.moveInput = isUsingGamepad ? gamepadStick(0) : keyDirection();
             this.velocity = this.velocity.add(this.moveInput.clampLength(1).scale(this.speed)); // clamp and scale input
@@ -328,7 +335,6 @@ class Boots extends EngineObject {
             }
         }
 
-        //cameraPos = this.pos;
         super.update();
     }
 
@@ -385,6 +391,38 @@ class Boots extends EngineObject {
         }
     }
 
+    addIngredient(ingredient) {
+        this.ingredients.push(ingredient);
+    }
+
+    hasIngredient(ingredientName) {
+        for (let i=0;i<this.ingredients.length;i++) {
+            if(this.ingredients[i].displayName = ingredientName) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    destroyIngredient(ingredientName) {
+        for (let i=0;i<this.ingredients.length;i++) {
+            if(this.ingredients[i].ingredients == ingredientName) {
+                this.ingredients[i].destroy();
+                this.ingredients.splice(i, 1);
+                break;
+            }
+        }
+    }
+
+    cleanUpIngredients() {
+        for (let i=0;i<this.ingredients.length;i++) {
+            this.ingredients[i].destroy();
+        }
+
+        this.ingredients = [];
+    }
+
     collideWithObject(o) {
         if(o instanceof Item) {
             this.addItem(o);
@@ -403,6 +441,14 @@ class Boots extends EngineObject {
             o.destroy();
         }
 
+        if(o instanceof Ingredient) {
+            this.addIngredient(o);
+            console.log(o);
+
+            buff_sound.play();
+            o.destroy();
+        }
+
         if(o instanceof Witch) {
             this.takeDamage(o.damage);
         }
@@ -413,6 +459,8 @@ class Boots extends EngineObject {
                 this.pos = vec2(o.teleportTo.pos);
                 play_sound("mirror");
             }
+
+            return false;
         }
 
         if(o instanceof Exit) {
@@ -424,6 +472,8 @@ class Boots extends EngineObject {
                 goToNextLevel();
             }
         }
+
+        return true;
     }
 
     takeDamage(dmg) {
@@ -499,6 +549,7 @@ class Witch extends EngineObject {
 const ItemType = {
     BUFF: 0,
     DEBUFF: 1,
+    INGREDIENT: 2,
 }
 
 const ItemName = {
@@ -507,6 +558,15 @@ const ItemName = {
     SALT: 2,
     CATNIP: 3,
     KEY: 4,
+    MUSHROOM: 5,
+    SASSAFRAS: 6,
+    WILLOW: 7,
+}
+
+const IngredientName = {
+    MUSHROOM: 0,
+    SASSAFRAS: 1,
+    WILLOW: 2,
 }
 
 class Item extends EngineObject {
@@ -539,6 +599,15 @@ class Item extends EngineObject {
         if(itemName == ItemName.KEY) {
             this.displayName = "Key";
         }
+        if(itemName == ItemName.MUSHROOM) {
+            this.displayName = "Mushroom";
+        }
+        if(itemName == ItemName.SASSAFRAS) {
+            this.displayName = "Sassafras";
+        }
+        if(itemName == ItemName.WILLOW) {
+            this.displayName = "Willow";
+        }
         this.destroyTimer = new Timer(5);
         this.destroyTimer.unset();
         this.setCollision();
@@ -549,6 +618,36 @@ class Item extends EngineObject {
         if(this.destroyTimer.elapsed()) {
             destroy();
         }
+    }
+}
+
+class Ingredient extends EngineObject {
+    constructor(pos, ingredientName) {
+        super(pos, vec2(1,1));
+        this.color = MAGENTA;
+
+        if(ingredientName == IngredientName.MUSHROOM) {
+            this.displayName = "Mushroom";
+        }
+        if(ingredientName == IngredientName.SASSAFRAS) {
+            this.displayName = "Sassafras";
+        }
+        if(ingredientName == IngredientName.WILLOW) {
+            this.displayName = "Willow";
+        }
+        
+        this.setCollision();
+        this.mass = 0;
+    }
+}
+
+class Tree extends EngineObject {
+    constructor(pos) {
+        var s = randInt(4)
+        super(pos, vec2(s,s));
+        this.color = new Color(0,0.5,0);
+        this.setCollision();
+        this.mass = 0;
     }
 }
 
@@ -588,6 +687,8 @@ function spawn_object(name=null) {
 function newGame() {
     cleanUpWitches();
     cleanUpItems();
+    cleanUpIngredients();
+    cleanUpTrees();
     new_game_sound.play();
     gameStarted = true;
     gameOver = false;
@@ -604,20 +705,26 @@ function newGame() {
 
 function goToNextLevel() {
     level += 1;
+    // reset camera pos to center
+    cameraPos = vec2(20,11);
+
     boots.velocity = vec2(0,0);
     boots.state = 'idle';
 
     cleanUpPortals();
+    cleanUpTrees();
 
     if(boots.mode == 'action') {
         boots.mode = 'puzzle';
+        levelSize = puzzleLevelSize;
     } else {
         boots.mode = 'action';
+        levelSize = actionLevelSize;
+        boots.cleanUpIngredients();
     }
 
     boots.pos = vec2(randInt(1, 6),randInt(1, 6));
     exit.pos = vec2(randInt(levelSize.x),randInt(5, levelSize.y));
-
     
     portals.push(new MirrorPortal(vec2(randInt(levelSize.x),randInt(5, levelSize.y))));
     portals.push(new MirrorPortal(vec2(randInt(levelSize.x),randInt(5, levelSize.y))));
@@ -632,6 +739,8 @@ function goToNextLevel() {
     
     if(boots.mode == 'action') {
         toggleWitches("action");
+        spawnTrees(50);
+        spawnIngredients(20);
         witches.push(new Witch(vec2(randInt(levelSize.x),randInt(5, levelSize.y))));
 
         boots.levelTimerAdd = boots.motions;
@@ -652,6 +761,7 @@ function goToNextLevel() {
         spawn_object(ItemName.KEY);
 
         toggleWitches("puzzle");
+        cleanUpIngredients();
 
         play_music("puzzle");
     }
@@ -720,11 +830,39 @@ function toggleWitches(mode) {
     }
 }
 
+function spawnIngredients(amount) {
+    for (let i=0;i<amount;i++) {
+
+        ingredients.push(new Ingredient(vec2(randInt(levelSize.x),randInt(levelSize.y)), randInt(3)));
+    }
+}
+
+function spawnTrees(amount) {
+    for (let i=0;i<amount;i++) {
+        trees.push(new Tree(vec2(randInt(levelSize.x),randInt(levelSize.y))));
+    }
+}
+
+function cleanUpTrees() {
+    for (let i=0;i<trees.length;i++) {
+        trees[i].destroy();
+    }
+
+    trees = [];
+}
+
 function cleanUpItems() {
     for (let i=0;i<items.length;i++) {
         items[i].destroy();
     }
     items = [];
+}
+
+function cleanUpIngredients() {
+    for (let i=0;i<ingredients.length;i++) {
+        ingredients[i].destroy();
+    }
+    ingredients = [];
 }
 
 function cleanUpPortals() {
@@ -744,15 +882,17 @@ function gameInit()
     fadeTime = 1;
     cameraPos = levelSize.scale(.5);
 
-    initialTime = 5;
+    initialTime = 20;
     clickTimer = new Timer(1);
     clickTimer.unset();
 
     gameStarted = false;
     gameOver = false;
 
+    trees = [];
     witches = [];
     items = [];
+    ingredients = [];
     portals = [];
 
     // create a table of all sprites
@@ -841,6 +981,12 @@ function gameRenderPost()
             itemsHeld += boots.items[i].displayName + ', ';
         }
         drawTextScreen('Items: ' + itemsHeld, vec2(80, 130), 30, BLACK);
+
+        var ingrdientsHeld = '';
+        for(var i=0;i<boots.ingredients.length;i++) {
+            ingrdientsHeld += boots.ingredients[i].displayName + ', ';
+        }
+        drawTextScreen('Ingredient: ' + ingrdientsHeld, vec2(100, 160), 30, BLACK);
         
         
         //drawTextScreen('Motions: ' + boots.motions, vec2(80, 100), 30, new Color(0,0,0));
