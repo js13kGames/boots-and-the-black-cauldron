@@ -7,7 +7,8 @@
 
 'use strict';
 
-let gameStarted, spriteAtlas, gameOver, level, levelSize, timer, initialTime, clickTimer, exit, boots, screenFadingFromBlack, screenAlpha, alph, fadeTime;
+let gameStarted, spriteAtlas, gameOver, level, levelSize, timer, initialTime, minIngredients, maxIngredients;
+let clickTimer, exit, boots, screenFadingFromBlack, screenAlpha, alph, fadeTime;
 let cauldron, witches, items, ingredients, score, portals, trees, walls;
 
 // sound effects
@@ -49,7 +50,6 @@ setInterval(function () {
 
     if (title_done) {
       var t1 = new Date();
-      console.log("msc title generate done (" + (t1 - t0) + "ms)");
 
       // Put the generated song in an Audio element.
       var wave = title_player.createWave();
@@ -73,7 +73,6 @@ setInterval(function () {
 
     if (action_done) {
       var t1 = new Date();
-      console.log("msc action generate done (" + (t1 - t0) + "ms)");
 
       // Put the generated song in an Audio element.
       var wave = action_player.createWave();
@@ -95,7 +94,6 @@ setInterval(function () {
 
     if (puzzle_done) {
       var t1 = new Date();
-      console.log("msc puzzle generate done (" + (t1 - t0) + "ms)");
 
       // Put the generated song in an Audio element.
       var wave = puzzle_player.createWave();
@@ -116,7 +114,6 @@ setInterval(function () {
 
     if (gameover_done) {
       var t1 = new Date();
-      console.log("msc gameover generate done (" + (t1 - t0) + "ms)");
 
       // Put the generated song in an Audio element.
       var wave = gameover_player.createWave();
@@ -141,7 +138,6 @@ setInterval(function () {
 
     if (mirror_done) {
       var t1 = new Date();
-      console.log("snd mirror generate done (" + (t1 - t0) + "ms)");
 
       // Put the generated song in an Audio element.
       var wave = mirror_player.createWave();
@@ -169,7 +165,6 @@ function play_sound(type) {
 }
 
 function play_music(type) {
-    console.log("Switching track to " + type);
     audio.pause();
     audio.currentTime = 0.0;
 
@@ -241,9 +236,6 @@ class Boots extends EngineObject {
     update() {
 
         if(this.mode == 'puzzle') {
-            // move camera with player
-            cameraPos = this.pos;
-
             // movement control (puzzle) grid based
             this.move = vec2(0,0);
 
@@ -263,7 +255,6 @@ class Boots extends EngineObject {
                 }
             } 
             if(keyWasPressed('ArrowDown') || gamepadWasPressed(13)) {
-                console.log(this.pos);
                 if(this.pos.y > this.size.y + 1) {
                     this.move = vec2(0,-1);
                 }
@@ -426,21 +417,24 @@ class Boots extends EngineObject {
     }
 
     useLastIngredient() {
-        console.log();
-
         var l = this.ingredients.length;
 
         if(l > 0) {
             if(cauldron && isOverlapping(this.pos, this.size, cauldron.pos, cauldron.size)) {
-                // we have thrown it into the cauldron :)
+                // we have thrown them into the cauldron :)
+                for(var i=0;i<this.ingredients.length;i++) {
+                    score += this.ingredients[i].points;
+                    this.motions -= 1;
+                }
+                
                 cauldron_ingredient_sound.play();
-                score += this.ingredients[l-1].points;
+                this.cleanUpIngredients();
+                
             } else {
                 drop_ingredient_sound.play();
-            }
-            
-            this.ingredients[l-1].destroy();
-            this.ingredients.splice(l-1, 1);
+                this.ingredients[l-1].destroy();
+                this.ingredients.splice(l-1, 1);
+            }  
         }
     }
 
@@ -465,7 +459,6 @@ class Boots extends EngineObject {
     collideWithObject(o) {
         if(o instanceof Item) {
             this.addItem(o);
-            console.log(o);
 
             if(o.itemName == ItemName.KEY){
                 key_pickup_sound.play();
@@ -482,7 +475,6 @@ class Boots extends EngineObject {
 
         if(o instanceof Ingredient) {
             this.addIngredient(o);
-            console.log(o);
 
             buff_sound.play();
             o.destroy();
@@ -493,7 +485,6 @@ class Boots extends EngineObject {
         }
 
         if(o instanceof MirrorPortal) {
-            console.log(o.teleportTo);
             if(o.teleportTo != null) {
                 this.pos = vec2(o.teleportTo.pos);
                 play_sound("mirror");
@@ -674,7 +665,7 @@ class Ingredient extends EngineObject {
 
 class Tree extends EngineObject {
     constructor(pos) {
-        var s = randInt(4)
+        var s = randInt(1, 4)
         super(pos, vec2(s,s));
         this.color = new Color(0,0.5,0);
         this.setCollision();
@@ -748,6 +739,8 @@ function newGame() {
     gameOver = false;
     score = 0;
     level = 0;
+    minIngredients = 20;
+    maxIngredients = 30;
 
     boots = new Boots();
     var i = new Item(vec2(0,0), ItemType.BUFF, ItemName.KEY);
@@ -759,10 +752,6 @@ function newGame() {
 }
 
 function goToNextLevel() {
-    level += 1;
-    boots.maxItems += 1;
-    boots.maxIngredients += 1;
-
     // reset camera pos to center
     cameraPos = vec2(20,11);
 
@@ -779,7 +768,13 @@ function goToNextLevel() {
     } else {
         boots.mode = 'action';
         levelSize = actionLevelSize;
-        boots.cleanUpIngredients();
+        level += 1;
+        minIngredients -+ 1;
+        if(minIngredients < 1) {
+            minIngredients = 1;
+        }
+        boots.maxItems += 1;
+        boots.maxIngredients += 1;
     }
 
     boots.pos = vec2(randInt(1, 6),randInt(1, 6));
@@ -894,9 +889,10 @@ function toggleWitches(mode) {
     }
 }
 
-function spawnIngredients(amount) {
-    for (let i=0;i<amount;i++) {
+function spawnIngredients(min, max) {
+    var n = randInt(min, max);
 
+    for (let i=0;i<n;i++) {
         ingredients.push(new Ingredient(vec2(randInt(levelSize.x),randInt(levelSize.y)), randInt(3)));
     }
 }
@@ -962,6 +958,8 @@ function gameInit()
     cameraPos = levelSize.scale(.5);
 
     score = 0;
+    minIngredients = 20;
+    maxIngredients = 30;
     initialTime = 20;
     clickTimer = new Timer(1);
     clickTimer.unset();
