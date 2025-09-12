@@ -8,7 +8,7 @@
 'use strict';
 
 let gameStarted, spriteAtlas, gameOver, level, levelSize, timer, initialTime, clickTimer, exit, boots, screenFadingFromBlack, screenAlpha, alph, fadeTime;
-let witches, items, ingredients, portals, trees;
+let witches, items, ingredients, portals, trees, walls;
 
 // sound effects
 const new_game_sound = new Sound([1.1,,378,.03,.06,.18,1,2.2,,,105,.08,,,,.1,,.59,.02]); // Pickup 10
@@ -237,33 +237,32 @@ class Boots extends EngineObject {
     update() {
 
         if(this.mode == 'puzzle') {
+            // move camera with player
+            cameraPos = this.pos;
+
             // movement control (puzzle) grid based
             this.move = vec2(0,0);
 
-            if(gamepadWasPressed(14)) {
-                this.move = vec2(-1,0);
+            if(keyWasPressed('ArrowLeft') || gamepadWasPressed(14)) {
+                if(this.pos.x > this.size.x) {
+                    this.move = vec2(-1,0);
+                }
             }
-            if(gamepadWasPressed(15)) {
-                this.move = vec2(1,0);
+            if(keyWasPressed('ArrowRight') || gamepadWasPressed(15)) {
+                if(this.pos.x < levelSize.x - (this.size.x + 1)) {
+                    this.move = vec2(1,0);
+                }
             } 
-            if(gamepadWasPressed(12)) {
-                this.move = vec2(0,1);
+            if(keyWasPressed('ArrowUp') || gamepadWasPressed(12)) {
+                if(this.pos.y < levelSize.y - (this.size.y + 1)) {
+                    this.move = vec2(0,1);
+                }
             } 
-            if(gamepadWasPressed(13)) {
-                this.move = vec2(0,-1);
-            }
-
-            if(keyWasPressed('ArrowLeft')) {
-                this.move = vec2(-1,0);
-            }
-            if(keyWasPressed('ArrowRight')) {
-                this.move = vec2(1,0);
-            } 
-            if(keyWasPressed('ArrowUp')) {
-                this.move = vec2(0,1);
-            } 
-            if(keyWasPressed('ArrowDown')) {
-                this.move = vec2(0,-1);
+            if(keyWasPressed('ArrowDown') || gamepadWasPressed(13)) {
+                console.log(this.pos);
+                if(this.pos.y > this.size.y + 1) {
+                    this.move = vec2(0,-1);
+                }
             }
 
             if(this.move.length() > 0) {
@@ -274,6 +273,7 @@ class Boots extends EngineObject {
             }
 
             this.pos = this.pos.add(this.move);
+
 
             for(var i=0;i<portals.length;i++) {
                 if(this.pos.x == portals[i].pos.x && this.pos.y == portals[i].pos.y) {
@@ -690,6 +690,18 @@ class MirrorPortal extends EngineObject {
     }
 }
 
+class Wall extends EngineObject
+{
+    constructor(pos, size)
+    {
+        super(pos, size); // set object position and size
+
+        this.setCollision(); // make object collide
+        this.mass = 0; // make object have static physics
+        this.color = BLACK;
+    }
+}
+
 function spawn_object(name=null) {
     if(name == null) {
         items.push(new Item(vec2(randInt(levelSize.x),randInt(5, levelSize.y)), randInt(0,Object.keys(ItemType).length), randInt(1,Object.keys(ItemName).length-1)));
@@ -751,6 +763,7 @@ function goToNextLevel() {
     
     cleanUpItems();
     spawn_object();
+    spawnWalls();
     
     if(boots.mode == 'action') {
         toggleWitches("action");
@@ -853,6 +866,13 @@ function spawnIngredients(amount) {
     }
 }
 
+function spawnWalls() {
+    new Wall(vec2(-.5,levelSize.y/2),            vec2(1,100)) // left
+    new Wall(vec2(levelSize.x+.5,levelSize.y/2), vec2(1,100)) // right
+    new Wall(vec2(levelSize.x/2,levelSize.y+.5), vec2(100,1)) // top
+    new Wall(vec2(levelSize.x/2,.5), vec2(100,1)) // bottom
+}
+
 function spawnTrees(amount) {
     for (let i=0;i<amount;i++) {
         trees.push(new Tree(vec2(randInt(levelSize.x),randInt(levelSize.y))));
@@ -865,6 +885,14 @@ function cleanUpTrees() {
     }
 
     trees = [];
+}
+
+function cleanUpWalls() {
+    for (let i=0;i<walls.length;i++) {
+        walls[i].destroy();
+    }
+
+    walls = [];
 }
 
 function cleanUpItems() {
@@ -906,6 +934,7 @@ function gameInit()
     gameOver = false;
 
     trees = [];
+    walls = [];
     witches = [];
     items = [];
     ingredients = [];
