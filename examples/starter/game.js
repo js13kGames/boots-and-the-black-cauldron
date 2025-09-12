@@ -8,7 +8,7 @@
 'use strict';
 
 let gameStarted, spriteAtlas, gameOver, level, levelSize, timer, initialTime, clickTimer, exit, boots, screenFadingFromBlack, screenAlpha, alph, fadeTime;
-let witches, items, ingredients, portals, trees, walls;
+let cauldron, witches, items, ingredients, score, portals, trees, walls;
 
 // sound effects
 const new_game_sound = new Sound([1.1,,378,.03,.06,.18,1,2.2,,,105,.08,,,,.1,,.59,.02]); // Pickup 10
@@ -19,6 +19,10 @@ const tick_sound = new Sound([3,,12,.03,.04,.009,,1.7,-2,,4,.02,,,,,.49,.87,.01,
 const buff_sound = new Sound([,,118,.05,.24,.3,,1.1,-10,,,,.1,,,,,.99,.12]); // Powerup 30
 const debuff_sound = new Sound([,,188,.03,.05,.19,3,3.5,,,,,.05,1.4,,.1,,.97,.04,.36]); // Hit 33
 const key_pickup_sound = new Sound([1.8,,438,.09,.29,.38,,2,,,462,.09,.04,,,.1,.06,.56,.18,.15,152]); // Powerup 58
+const cauldron_ingredient_sound = new Sound([2.3,,155,.01,.15,.2,,.2,,-8,-146,.07,,,.1,,.19,.51,.27,,760]); // Powerup 61
+cauldron_ingredient_sound.randomness = .3;
+const drop_ingredient_sound = new Sound([1.7,,433,.02,.04,.02,4,3.7,,,,,,1.5,,.2,.04,.65,.09,,206]); // Hit 64
+drop_ingredient_sound.randomness = .3;
 
 // music section
 let audio = document.createElement("audio");
@@ -230,8 +234,8 @@ class Boots extends EngineObject {
         this.items = [];
         this.ingredients = [];
 
-        this.maxItems = 2;
-        this.maxIngredients = 1;
+        this.maxItems = 0;
+        this.maxIngredients = 0;
     }
 
     update() {
@@ -277,7 +281,6 @@ class Boots extends EngineObject {
 
             for(var i=0;i<portals.length;i++) {
                 if(this.pos.x == portals[i].pos.x && this.pos.y == portals[i].pos.y) {
-                    console.log(portals[i].teleportTo);
                     if(portals[i].teleportTo != null) {
                         boots.pos = vec2(portals[i].teleportTo.pos);
                         play_sound("mirror");
@@ -423,9 +426,19 @@ class Boots extends EngineObject {
     }
 
     useLastIngredient() {
+        console.log();
+
         var l = this.ingredients.length;
 
         if(l > 0) {
+            if(cauldron && isOverlapping(this.pos, this.size, cauldron.pos, cauldron.size)) {
+                // we have thrown it into the cauldron :)
+                cauldron_ingredient_sound.play();
+                score += this.ingredients[l-1].points;
+            } else {
+                drop_ingredient_sound.play();
+            }
+            
             this.ingredients[l-1].destroy();
             this.ingredients.splice(l-1, 1);
         }
@@ -643,12 +656,15 @@ class Ingredient extends EngineObject {
 
         if(ingredientName == IngredientName.MUSHROOM) {
             this.displayName = "Mushroom";
+            this.points = 10;
         }
         if(ingredientName == IngredientName.SASSAFRAS) {
             this.displayName = "Sassafras";
+            this.points = 10;
         }
         if(ingredientName == IngredientName.WILLOW) {
             this.displayName = "Willow";
+            this.points = 10;
         }
         
         this.setCollision();
@@ -690,6 +706,16 @@ class MirrorPortal extends EngineObject {
     }
 }
 
+class Cauldron extends EngineObject
+{
+    constructor(pos) {
+        super(pos, vec2(3,3));
+        this.color = PURPLE;
+        this.setCollision();
+        this.mass = 0;
+    }
+}
+
 class Wall extends EngineObject
 {
     constructor(pos, size)
@@ -716,9 +742,11 @@ function newGame() {
     cleanUpItems();
     cleanUpIngredients();
     cleanUpTrees();
+    cleanUpWalls();
     new_game_sound.play();
     gameStarted = true;
     gameOver = false;
+    score = 0;
     level = 0;
 
     boots = new Boots();
@@ -732,6 +760,9 @@ function newGame() {
 
 function goToNextLevel() {
     level += 1;
+    boots.maxItems += 1;
+    boots.maxIngredients += 1;
+
     // reset camera pos to center
     cameraPos = vec2(20,11);
 
@@ -740,6 +771,7 @@ function goToNextLevel() {
 
     cleanUpPortals();
     cleanUpTrees();
+    cleanUpWalls();
 
     if(boots.mode == 'action') {
         boots.mode = 'puzzle';
@@ -762,14 +794,16 @@ function goToNextLevel() {
     }
     
     cleanUpItems();
-    spawn_object();
     spawnWalls();
     
     if(boots.mode == 'action') {
         toggleWitches("action");
         spawnTrees(50);
         spawnIngredients(20);
+        spawn_object();
+        spawn_object();
         witches.push(new Witch(vec2(randInt(levelSize.x),randInt(5, levelSize.y))));
+        cauldron.destroy();
 
         boots.levelTimerAdd = boots.motions;
 
@@ -786,6 +820,7 @@ function goToNextLevel() {
 
         boots.motionsThisLevel = boots.motions + boots.levelMotionsAdd;
 
+        cauldron = new Cauldron(vec2(levelSize.x/2, levelSize.y/2));
         spawn_object(ItemName.KEY);
 
         toggleWitches("puzzle");
@@ -867,10 +902,10 @@ function spawnIngredients(amount) {
 }
 
 function spawnWalls() {
-    new Wall(vec2(-.5,levelSize.y/2),            vec2(1,100)) // left
-    new Wall(vec2(levelSize.x+.5,levelSize.y/2), vec2(1,100)) // right
-    new Wall(vec2(levelSize.x/2,levelSize.y+.5), vec2(100,1)) // top
-    new Wall(vec2(levelSize.x/2,.5), vec2(100,1)) // bottom
+    walls.push(new Wall(vec2(-.5,levelSize.y/2),            vec2(1,100))) // left
+    walls.push(new Wall(vec2(levelSize.x+.5,levelSize.y/2), vec2(1,100))) // right
+    walls.push(new Wall(vec2(levelSize.x/2,levelSize.y+.5), vec2(100,1))) // top
+    walls.push(new Wall(vec2(levelSize.x/2,.5), vec2(100,1))) // bottom
 }
 
 function spawnTrees(amount) {
@@ -926,6 +961,7 @@ function gameInit()
     fadeTime = 1;
     cameraPos = levelSize.scale(.5);
 
+    score = 0;
     initialTime = 20;
     clickTimer = new Timer(1);
     clickTimer.unset();
@@ -933,6 +969,7 @@ function gameInit()
     gameStarted = false;
     gameOver = false;
 
+    cauldron = new Cauldron(vec2(levelSize.x/2, levelSize.y/2));
     trees = [];
     walls = [];
     witches = [];
@@ -988,7 +1025,15 @@ function gameRender()
 {
     // draw white background during play
     if(gameStarted) {
-        drawRect(cameraPos, levelSize, WHITE);
+        if(boots.mode == "action") {
+            // woods so green ground
+            drawRect(cameraPos, levelSize, new Color(0.0, 0.4, 0.0));
+        } else {
+            // hut so brown floor
+            drawRect(cameraPos, levelSize, new Color(0.4, 0.4, 0.1));
+        }
+        
+
     }
 }
 
@@ -1005,7 +1050,7 @@ function gameRenderPost()
         } else {
             drawTextScreen('Game Over', vec2(mainCanvasSize.x/2, mainCanvasSize.y/2), 160, RED);
             drawTextScreen('Level ' + level + ' Reached', vec2(mainCanvasSize.x/2, mainCanvasSize.y/2+100), 60, RED);
-            //drawTextScreen('Total Motions: ' + boots.totalMotions, vec2(mainCanvasSize.x/2, mainCanvasSize.y/2+200), 60, new Color(1,0,0));
+            drawTextScreen('Final Score: ' + score, vec2(mainCanvasSize.x/2, mainCanvasSize.y/2+200), 60, RED);
         }
         
     } else {
@@ -1033,10 +1078,7 @@ function gameRenderPost()
             ingrdientsHeld += boots.ingredients[i].displayName + ', ';
         }
         drawTextScreen('Ingredient: ' + ingrdientsHeld, vec2(100, 160), 30, BLACK);
-        
-        
-        //drawTextScreen('Motions: ' + boots.motions, vec2(80, 100), 30, new Color(0,0,0));
-        //drawTextScreen('Total Motions: ' + boots.totalMotions, vec2(110, 130), 30, new Color(0,0,0));
+        drawTextScreen('Score: ' + score, vec2(80, 190), 30, new Color(0,0,0));
     }
 
     if(screenFadingFromBlack) {
