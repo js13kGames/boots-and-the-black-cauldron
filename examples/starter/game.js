@@ -229,6 +229,9 @@ class Boots extends EngineObject {
 
         this.items = [];
         this.ingredients = [];
+
+        this.maxItems = 2;
+        this.maxIngredients = 1;
     }
 
     update() {
@@ -305,6 +308,12 @@ class Boots extends EngineObject {
             }
         }
 
+        // player actions
+        if(keyWasPressed('Space') || gamepadWasPressed(0)) {
+            // use ingredients
+            this.useLastIngredient();
+        }
+
         if(keyWasPressed('KeyM')) {
             if(this.mode == 'action') {
                 this.mode = 'puzzle';
@@ -339,6 +348,10 @@ class Boots extends EngineObject {
     }
 
     addItem(item) {
+        if(this.items.length == this.maxItems) {
+            return;
+        }
+
         if(item.displayName != 'Key') {
             item.destroyTimer.set(5);
         }
@@ -364,7 +377,7 @@ class Boots extends EngineObject {
 
     hasItem(itemName) {
         for (let i=0;i<this.items.length;i++) {
-            if(this.items[i].itemName = itemName) {
+            if(this.items[i].itemName == itemName) {
                 return true;
             }
         }
@@ -392,6 +405,10 @@ class Boots extends EngineObject {
     }
 
     addIngredient(ingredient) {
+        if(this.ingredients.length == this.maxIngredients) {
+            return;
+        }
+
         this.ingredients.push(ingredient);
     }
 
@@ -403,6 +420,15 @@ class Boots extends EngineObject {
         }
 
         return false;
+    }
+
+    useLastIngredient() {
+        var l = this.ingredients.length;
+
+        if(l > 0) {
+            this.ingredients[l-1].destroy();
+            this.ingredients.splice(l-1, 1);
+        }
     }
 
     destroyIngredient(ingredientName) {
@@ -553,14 +579,11 @@ const ItemType = {
 }
 
 const ItemName = {
-    CLOVER: 0,
+    KEY: 0,
     RABBIT_FOOT: 1,
     SALT: 2,
     CATNIP: 3,
-    KEY: 4,
-    MUSHROOM: 5,
-    SASSAFRAS: 6,
-    WILLOW: 7,
+    CLOVER: 4,
 }
 
 const IngredientName = {
@@ -584,8 +607,8 @@ class Item extends EngineObject {
         this.itemName = itemName;
         this.displayName = '';
 
-        if(itemName == ItemName.CLOVER) {
-            this.displayName = "Clover";
+        if(itemName == ItemName.KEY) {
+            this.displayName = "Key";
         }
         if(itemName == ItemName.RABBIT_FOOT) {
             this.displayName = "Rabbit Foot";
@@ -596,18 +619,10 @@ class Item extends EngineObject {
         if(itemName == ItemName.CATNIP) {
             this.displayName = "Catnip";
         }
-        if(itemName == ItemName.KEY) {
-            this.displayName = "Key";
+        if(itemName == ItemName.CLOVER) {
+            this.displayName = "Clover";
         }
-        if(itemName == ItemName.MUSHROOM) {
-            this.displayName = "Mushroom";
-        }
-        if(itemName == ItemName.SASSAFRAS) {
-            this.displayName = "Sassafras";
-        }
-        if(itemName == ItemName.WILLOW) {
-            this.displayName = "Willow";
-        }
+        
         this.destroyTimer = new Timer(5);
         this.destroyTimer.unset();
         this.setCollision();
@@ -676,8 +691,8 @@ class MirrorPortal extends EngineObject {
 }
 
 function spawn_object(name=null) {
-    if(name == null || name == "") {
-        items.push(new Item(vec2(randInt(levelSize.x),randInt(5, levelSize.y)), randInt(0,Object.keys(ItemType).length), randInt(0,Object.keys(ItemName).length-1)));
+    if(name == null) {
+        items.push(new Item(vec2(randInt(levelSize.x),randInt(5, levelSize.y)), randInt(0,Object.keys(ItemType).length), randInt(1,Object.keys(ItemName).length-1)));
     } else {
         items.push(new Item(vec2(randInt(levelSize.x),randInt(5, levelSize.y)), randInt(0,Object.keys(ItemType).length), name));
     }
@@ -773,6 +788,7 @@ function goToNextLevel() {
 function die() {
     boots.velocity = vec2(0,0);
     boots.cleanUpItems();
+    boots.cleanUpIngredients();
     boots.speed = .1
     boots.health = 1;
     boots.state = 'idle';
@@ -954,8 +970,9 @@ function gameRenderPost()
     if (!gameStarted) {
         if(!gameOver) {
             drawTextScreen('Boots the Cat', vec2(mainCanvasSize.x/2, 0 + 70), 80);
-            drawTextScreen('in', vec2(mainCanvasSize.x/2, mainCanvasSize.y/2), 80);
-            drawTextScreen('Broken Whiskerz', vec2(mainCanvasSize.x/2, mainCanvasSize.y - 70), 80);
+            drawTextScreen('in', vec2(mainCanvasSize.x/2, mainCanvasSize.y/2 - 100), 80);
+            drawTextScreen('Boots and the', vec2(mainCanvasSize.x/2, mainCanvasSize.y - 260), 80);
+            drawTextScreen('Black Cauldron', vec2(mainCanvasSize.x/2, mainCanvasSize.y - 170), 80);
         } else {
             drawTextScreen('Game Over', vec2(mainCanvasSize.x/2, mainCanvasSize.y/2), 160, RED);
             drawTextScreen('Level ' + level + ' Reached', vec2(mainCanvasSize.x/2, mainCanvasSize.y/2+100), 60, RED);
